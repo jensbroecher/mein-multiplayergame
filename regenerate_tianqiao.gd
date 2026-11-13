@@ -57,6 +57,11 @@ const MALL := Rect2(160.0, 530.0, 270.0, 300.0)
 const HALL := Rect2(172.0, 612.0, 248.0, 86.0)
 const HALL_FLOOR := 22.0
 const HALL_TOP := 100.0
+## The hall's walls stand this far over the mall's roof and its vault springs from their top; the way in off the roof
+## is an opening `HALL_ENTRY_H` high under a lintel (the vault had sprung 4m over the roof, its ribs and glass coming
+## down into the opening in front of the cars).
+const HALL_EAVE := 13.0
+const HALL_ENTRY_H := 11.0
 const AQUA := Rect2(203.0, 698.0, 84.0, 128.0)
 const AQUA_FLOOR := 18.0
 const AQUA_SURFACE := 44.0
@@ -287,6 +292,7 @@ func _build_dressing(root: Node3D) -> void:
 	_build_city()
 	_build_skyline(root)
 	_build_crowds()
+	_build_air_taxis(root, TAXI_ROUTES)
 	print("  dressing: %d buildings, %d people" % [_bid, _people.size()])
 
 
@@ -347,13 +353,23 @@ func _build_supertall() -> void:
 			MCK.prism(pk, kit, fin, Y_TOP - 0.1, Y_TOP + 62.0 - 6.0 * float(k % 2), Color(0.3, 0.32, 0.36), MCK.STYLE_CLADDING, id + 4, true)
 			MCK.led_line(pk, kit, Vector3((p + dirv * 3.0).x, Y_TOP, (p + dirv * 3.0).y), Vector3((p + dirv * 3.0).x, Y_TOP + 62.0 - 6.0 * float(k % 2), (p + dirv * 3.0).y),
 					Color(0.95, 0.75, 0.3, 0.0), 0.4)
-		for ring in [Y_TOP + 20.0, Y_TOP + 38.0, Y_TOP + 54.0]:
-			var pts: Array = []
-			for k2 in range(33):
-				var a2: float = TAU * float(k2) / 32.0
-				pts.append(Vector3(c.x + cos(a2) * (h * 1.32), ring, c.y + sin(a2) * (h * 1.32)))
-			for k3 in range(32):
-				MCK.led_line(pk, kit, pts[k3], pts[k3 + 1], Color(0.95, 0.8, 0.4, 0.0), 0.35)
+		# The crown's rings: steel chords from fin to fin at three heights, LED along them, crossed braces between them
+		# (as circles they had touched the fins only at their tips and hung in the air between).
+		var rings: Array = [Y_TOP + 20.0, Y_TOP + 38.0, Y_TOP + 54.0]
+		var fin_at := func(k: int, y: float) -> Vector3:
+			var ang2: float = PI * 0.25 + PI * 0.5 * float(k % 4)
+			var q := c + Vector2(cos(ang2), sin(ang2)) * (h * 1.414 - 6.0)
+			return Vector3(q.x, y, q.y)
+		for k3 in range(4):
+			for ri in range(rings.size()):
+				var a3: Vector3 = fin_at.call(k3, rings[ri])
+				var b3: Vector3 = fin_at.call(k3 + 1, rings[ri])
+				pk.beam(kit, "steel", a3, b3, 0.9, 0.9, Color(0.34, 0.35, 0.4))
+				var o3 := Vector3((a3 + b3).x * 0.5 - c.x, 0, (a3 + b3).z * 0.5 - c.y).normalized()
+				MCK.led_line(pk, kit, a3 + o3 * 0.5, b3 + o3 * 0.5, Color(0.95, 0.8, 0.4, 0.0), 0.35)
+				if ri + 1 < rings.size():
+					pk.beam(kit, "steel", a3, fin_at.call(k3 + 1, rings[ri + 1]), 0.45, 0.45, Color(0.34, 0.35, 0.4))
+					pk.beam(kit, "steel", b3, fin_at.call(k3, rings[ri + 1]), 0.45, 0.45, Color(0.34, 0.35, 0.4))
 		# The spire stands on the deck's north side, clear of the grid.
 		var sp := Vector3(c.x - 6.0, Y_TOP, c.y - 26.0)
 		pk.tube(kit, "steel", sp, sp + Vector3(0, 110.0, 0), 2.2, 0.5, 10, Color(0.6, 0.62, 0.66))
@@ -590,6 +606,23 @@ func _build_mall() -> void:
 	, 3800.0)
 
 
+# ---- Air taxis over the course ---------------------------------------------------------------------------------------
+
+## Loops the air taxis fly (AirTaxis.gd, the user's idea): over the start straight 20m over the Yunlang's roof, round the
+## spiral tower above its top, over the mall's roof between the library and the ring tunnel and back over the hall's
+## vault, and round the park at the finish. Each clear of everything by `res://scratch/flight_path_clearance.gd`.
+const TAXI_ROUTES: Array = [
+	{"points": [Vector3(95, 170, -62), Vector3(300, 170, -76), Vector3(380, 172, 0), Vector3(300, 170, 76), Vector3(95, 170, 62), Vector3(70, 170, 0)],
+		"speed": 26.0, "count": 2},
+	{"points": [Vector3(390, 148, 252), Vector3(468, 148, 300), Vector3(468, 150, 370), Vector3(390, 150, 408), Vector3(318, 148, 360),
+		Vector3(318, 148, 292)], "speed": 22.0, "count": 1},
+	{"points": [Vector3(350, 98, 545), Vector3(440, 98, 560), Vector3(458, 104, 620), Vector3(410, 112, 668), Vector3(320, 114, 684),
+		Vector3(290, 108, 630), Vector3(312, 100, 582)], "speed": 20.0, "count": 2},
+	{"points": [Vector3(735, 46, 990), Vector3(900, 50, 1015), Vector3(950, 52, 1180), Vector3(840, 52, 1300), Vector3(690, 50, 1230),
+		Vector3(655, 48, 1070)], "speed": 22.0, "count": 2},
+]
+
+
 # ---- The Xinghe Library on the mall's roof ----------------------------------------------------------------------------
 
 ## Where the car park was (the user wanted a futuristic structure of the mall's complex there): the Xinghe Library
@@ -609,6 +642,72 @@ func _ellipse(c: Vector2, r: Vector2, rot: float, n: int) -> PackedVector2Array:
 		var p := Vector2(cos(a) * r.x, sin(a) * r.y).rotated(rot)
 		out.append(c + p)
 	return out
+
+
+## A blade swept along `pts` (a smooth curve): `w` across along each point's `outs` (horizontal), `t` thick, its four
+## faces continuous from end to end with smooth normals, capped at both ends.
+func _blade(pk: PropKit, kit: Dictionary, key: String, pts: Array, outs: Array, w: float, t: float, col: Color) -> void:
+	var n: int = pts.size()
+	var rings: Array = []
+	var frames: Array = []
+	for i in range(n):
+		var tg: Vector3 = ((pts[mini(i + 1, n - 1)] as Vector3) - (pts[maxi(i - 1, 0)] as Vector3)).normalized()
+		var r: Vector3 = outs[i]
+		r = (r - tg * r.dot(tg)).normalized()
+		var sd: Vector3 = tg.cross(r).normalized()
+		var c: Vector3 = pts[i]
+		rings.append([c + r * w * 0.5 + sd * t * 0.5, c + r * w * 0.5 - sd * t * 0.5, c - r * w * 0.5 - sd * t * 0.5, c - r * w * 0.5 + sd * t * 0.5])
+		frames.append([r, -sd, -r, sd])
+	# Face f runs from corner f to corner f+1; its normal is the frame's direction between them.
+	var face_dirs: Array = [[0, 1, 0], [1, 2, 1], [2, 3, 2], [3, 0, 3]]
+	for i in range(n - 1):
+		for fd in face_dirs:
+			var ca: int = fd[0]
+			var cb: int = fd[1]
+			var na: Vector3 = (frames[i] as Array)[fd[2]]
+			var nb: Vector3 = (frames[i + 1] as Array)[fd[2]]
+			var a0: Vector3 = (rings[i] as Array)[ca]
+			var a1: Vector3 = (rings[i] as Array)[cb]
+			var b0: Vector3 = (rings[i + 1] as Array)[ca]
+			var b1: Vector3 = (rings[i + 1] as Array)[cb]
+			var out: Vector3 = (na + nb).normalized()
+			pk.tri(kit, key, a0, a1, b1, na, na, nb, col, out)
+			pk.tri(kit, key, a0, b1, b0, na, nb, nb, col, out)
+	for e in [[0, -1.0], [n - 1, 1.0]]:
+		var rg: Array = rings[int(e[0])]
+		var i2: int = int(e[0])
+		var tg2: Vector3 = ((pts[mini(i2 + 1, n - 1)] as Vector3) - (pts[maxi(i2 - 1, 0)] as Vector3)).normalized() * float(e[1])
+		pk.quad(kit, key, rg, tg2, col)
+
+
+## Boxes for the runtime's colliders, gathered while a batch is built: [transform, size].
+var _roof_solids: Array = []
+
+
+## A box along a to b, `w` square (or `w` across `side` when given), into `_roof_solids`.
+func _beam_solid(a: Vector3, b: Vector3, w: float, side := Vector3.ZERO) -> void:
+	var d: Vector3 = b - a
+	var ln: float = d.length()
+	if ln < 0.05:
+		return
+	var z: Vector3 = d / ln
+	var x: Vector3 = side if side.length_squared() > 1e-6 else Vector3.UP.cross(z)
+	if x.length_squared() < 1e-6:
+		x = Vector3.RIGHT
+	x = (x - z * x.dot(z)).normalized()
+	var y: Vector3 = z.cross(x).normalized()
+	_roof_solids.append([Transform3D(Basis(x, y, z), (a + b) * 0.5), Vector3(w, minf(w, 0.6) if side.length_squared() > 1e-6 else w, ln + 0.2)])
+
+
+## A square planter of polished stone `size` across at p (on its floor), soil on top, an LED line round its rim.
+func _planter(pk: PropKit, kit: Dictionary, p: Vector3, size: float, led: Color) -> void:
+	var h := 0.9
+	pk.block(kit, "tower", p + Vector3(-size, 0, -size), p + Vector3(size, h, size), Color(0.62, 0.62, 0.66, float(MCK.STYLE_CONCRETE) / 8.0))
+	pk.block(kit, "matte", p + Vector3(-size + 0.15, h, -size + 0.15), p + Vector3(size - 0.15, h + 0.04, size - 0.15), Color(0.16, 0.11, 0.07))
+	var r: float = size + 0.03
+	var y: float = h - 0.12
+	for e in [[Vector3(-r, y, -r), Vector3(r, y, -r)], [Vector3(r, y, -r), Vector3(r, y, r)], [Vector3(r, y, r), Vector3(-r, y, r)], [Vector3(-r, y, r), Vector3(-r, y, -r)]]:
+		MCK.led_line(pk, kit, p + (e[0] as Vector3), p + (e[1] as Vector3), led, 0.08)
 
 
 func _build_library() -> void:
@@ -636,18 +735,43 @@ func _build_library() -> void:
 				# A glass balustrade round each terrace (the wall stands back from the slab's edge).
 				if k % 2 == 0:
 					MCK.glass_rail(pk, kit, Vector3(a.x, yb + 0.5, a.y), Vector3(b.x, yb + 0.5, b.y), 1.1, Color(0.55, 0.85, 1.0, 0.0))
-		# White fins round the stack: tall curved blades leaning with its twist, every other one lit along its edge.
+		# White fins round the stack: tall curved blades leaning with its twist, each one continuous blade swept along
+		# its curve (two straight beams had met at a kink with their ends apart), standing just outside the slabs and tied
+		# to each slab's edge; every other one lit along its outer edge.
+		var top_h: float = y0 + LIB_FLOOR * float(LIB_TIERS) + 3.0
 		for k2 in range(28):
 			var a2: float = TAU * float(k2) / 28.0
-			var top_h: float = y0 + LIB_FLOOR * float(LIB_TIERS) + 3.0
-			var p0 := LIB_C + Vector2(cos(a2) * LIB_R.x * 1.06, sin(a2) * LIB_R.y * 1.06)
-			var p1 := LIB_C + Vector2(cos(a2 + 0.36) * LIB_R.x * 0.92, sin(a2 + 0.36) * LIB_R.y * 0.92)
-			var mid := LIB_C + Vector2(cos(a2 + 0.18) * LIB_R.x * 1.1, sin(a2 + 0.18) * LIB_R.y * 1.1)
-			var pts: Array = [Vector3(p0.x, y0, p0.y), Vector3(mid.x, (y0 + top_h) * 0.5, mid.y), Vector3(p1.x, top_h, p1.y)]
-			for j in range(2):
-				pk.beam(kit, "gloss", pts[j], pts[j + 1], 0.35, 1.2, white)
-				if k2 % 2 == 0:
-					MCK.led_line(pk, kit, (pts[j] as Vector3) + Vector3(0, 0, 0), pts[j + 1], Color(1.0, 0.45, 0.85, 0.5), 0.12)
+			var pts: Array = []
+			var outs: Array = []
+			var n_s := 14
+			for j in range(n_s + 1):
+				var t: float = float(j) / float(n_s)
+				var an: float = a2 + 0.36 * t
+				var rf: float = 1.06 + 0.05 * sin(PI * t) - 0.04 * t
+				var q := LIB_C + Vector2(cos(an) * LIB_R.x * rf, sin(an) * LIB_R.y * rf)
+				pts.append(Vector3(q.x, lerpf(y0, top_h, t), q.y))
+				# Outward: the ellipse's normal there.
+				var nrm := Vector2(cos(an) / LIB_R.x, sin(an) / LIB_R.y).normalized()
+				outs.append(Vector3(nrm.x, 0, nrm.y))
+			_blade(pk, kit, "gloss", pts, outs, 1.2, 0.35, white)
+			for j3 in range(0, n_s, 2):
+				_beam_solid(pts[j3], pts[j3 + 2], 1.2, outs[j3 + 1])
+			if k2 % 2 == 0:
+				for j2 in range(n_s):
+					MCK.led_line(pk, kit, (pts[j2] as Vector3) + (outs[j2] as Vector3) * 0.62, (pts[j2 + 1] as Vector3) + (outs[j2 + 1] as Vector3) * 0.62,
+							Color(1.0, 0.45, 0.85, 0.5), 0.12)
+			# Ties from each slab's edge to the blade.
+			for t3 in range(1, LIB_TIERS):
+				var yt: float = y0 + LIB_FLOOR * float(t3) + 0.25
+				var tf: float = (yt - y0) / (top_h - y0)
+				var jf: int = clampi(int(round(tf * float(n_s))), 0, n_s)
+				var fp: Vector3 = pts[jf]
+				fp.y = yt
+				var rot3: float = 0.09 * float(t3)
+				var r3: Vector2 = LIB_R * (1.0 - 0.1 * float(t3) / float(LIB_TIERS - 1))
+				var pa: float = atan2((fp.z - LIB_C.y) / LIB_R.y, (fp.x - LIB_C.x) / LIB_R.x) - rot3
+				var sp := LIB_C + Vector2(cos(pa) * r3.x * 0.98, sin(pa) * r3.y * 0.98).rotated(rot3)
+				pk.beam(kit, "gloss", Vector3(sp.x, yt, sp.y), fp - (outs[jf] as Vector3) * 0.3, 0.22, 0.22, white)
 		# The book core: a drum of lit shelves through the middle, seen through the glass.
 		var core := _ellipse(LIB_C, LIB_R * 0.38, 0.0, 24)
 		MCK.prism(pk, kit, core, y0, y0 + LIB_FLOOR * float(LIB_TIERS), Color(0.95, 0.85, 0.7), MCK.STYLE_INTERIOR, id + 9, false)
@@ -670,10 +794,12 @@ func _build_library() -> void:
 				if k5 > 0:
 					MCK.led_line(pk, kit, prev, pp, Color(0.95, 0.9, 0.75, 0.0), 0.12)
 				prev = pp
-		for k6 in range(16):
-			var an3: float = TAU * float(k6) / 16.0
-			var tp := Vector3(LIB_C.x + cos(an3) * LIB_R.x * 0.62, ry, LIB_C.y + sin(an3) * LIB_R.y * 0.62)
-			pk.lathe(kit, "matte", tp, [Vector2(0.001, 0.0), Vector2(1.6, 0.8), Vector2(1.9, 2.0), Vector2(1.1, 3.0), Vector2(0.001, 3.3)], 8, Color(0.12, 0.22, 0.12))
+		# Trees in planters round the dome (they had been dark green lumps).
+		for k6 in range(10):
+			var an3: float = TAU * (float(k6) + 0.5) / 10.0
+			var tp := Vector3(LIB_C.x + cos(an3) * LIB_R.x * 0.6, ry, LIB_C.y + sin(an3) * LIB_R.y * 0.6)
+			_planter(pk, kit, tp, 1.6, Color(0.55, 0.85, 1.0, 0.0))
+			extra_trees.append([["sakura", "momiji", "matsu"][k6 % 3], tp.x, tp.z, rng.randf_range(0.38, 0.46), k6 % 2, ry + 0.9])
 		# Its name on the stack's north face, toward the jump's landing.
 		MCK.neon_sign(pk, kit, labels, Vector3(LIB_C.x, ry + 2.2, LIB_C.y - LIB_R.y * 0.85), Vector3(0, 0, -1), 20.0, 3.4, "星河图书馆", Color(0.55, 0.85, 1.0))
 		# The sky garden's lattice shell east of the lap (x 312-425, z 537-562): arches of white tubes, lit at the joints.
@@ -691,27 +817,54 @@ func _build_library() -> void:
 				var pp2 := Vector3(x + lean * sin(an4), Y_MALL + sin(an4) * hgt, gz - cos(an4) * 11.0)
 				if k8 > 0:
 					pk.beam(kit, "gloss", prev2, pp2, 0.3, 0.3, white)
+					_beam_solid(prev2, pp2, 0.4)
 				if k8 % 2 == 0:
 					pk.block(kit, "neon", pp2 - Vector3(0.18, 0.18, 0.18), pp2 + Vector3(0.18, 0.18, 0.18), Color(0.7, 0.9, 1.0))
 				prev2 = pp2
-		for k9 in range(10):
-			var tp2 := Vector3(rng.randf_range(gx0 + 4.0, gx1 - 4.0), Y_MALL, gz + rng.randf_range(-7.0, 7.0))
-			pk.lathe(kit, "matte", tp2, [Vector2(0.001, 0.0), Vector2(1.4, 1.2), Vector2(1.8, 2.6), Vector2(1.0, 3.8), Vector2(0.001, 4.2)], 8, Color(0.1, 0.2, 0.11))
-			pk.tube(kit, "paint", tp2, tp2 + Vector3(0, 1.4, 0), 0.15, 0.12, 6, Color(0.25, 0.18, 0.12))
-		# A tunnel of LED rings over the lap where it runs east across the roof (their feet off the road).
+		# The sky garden under the shell: trees in planters down its middle (they had been dark green lumps on sticks).
+		for k9 in range(7):
+			var tp2 := Vector3(lerpf(gx0 + 8.0, gx1 - 8.0, float(k9) / 6.0) + rng.randf_range(-3.0, 3.0), Y_MALL - 0.06, gz + (2.5 if k9 % 2 == 0 else -2.5))
+			_planter(pk, kit, tp2, 2.0, Color(0.7, 0.9, 1.0, 0.0))
+			extra_trees.append([["sakura", "shidare", "momiji", "sakura"][k9 % 4], tp2.x, tp2.z, rng.randf_range(0.45, 0.55), k9 % 2, tp2.y + 0.9])
+			_roof_solids.append([Transform3D(Basis(), tp2 + Vector3(0, 0.45, 0)), Vector3(4.0, 0.9, 4.0)])
+		# A tunnel of LED rings over the lap where it runs east across the roof: steel arches standing on plinths on the
+		# roof either side of the road (they had started 2m up in the air), the LED on their inner faces.
 		var s_r0: float = _s_after(Vector2(330.0, 575.0), float(_a["land2"]))
+		var foot_y: float = Y_MALL - 0.1
 		for k10 in range(5):
 			var sr: float = s_r0 + 14.0 * float(k10)
-			var c: Vector3 = lap.pt(sr) + Vector3(0, 2.0, 0)
+			var lp: Vector3 = lap.pt(sr)
+			var c := Vector3(lp.x, foot_y + 0.6, lp.z)
 			var rt: Vector3 = lap.rt(sr)
+			rt = Vector3(rt.x, 0, rt.z).normalized()
+			var led_c := Color.from_hsv(0.55 + 0.08 * float(k10), 0.7, 1.0, 0.6)
 			var prev3 := Vector3.ZERO
+			var prev_o := Vector3.ZERO
 			for k11 in range(25):
 				var an5: float = PI * float(k11) / 24.0
-				var pp3: Vector3 = c + rt * cos(an5) * 11.5 + Vector3(0, sin(an5) * 10.0, 0)
+				var pp3: Vector3 = c + rt * cos(an5) * 11.5 + Vector3(0, sin(an5) * 11.0, 0)
+				# Outward from the arch's middle (the ellipse's normal), for the steel behind the LED.
+				var o5 := (rt * cos(an5) / 11.5 + Vector3(0, sin(an5) / 11.0, 0)).normalized()
 				if k11 > 0:
-					MCK.led_line(pk, kit, prev3, pp3, Color.from_hsv(0.55 + 0.08 * float(k10), 0.7, 1.0, 0.6), 0.45)
+					pk.beam(kit, "steel", prev3 + prev_o * 0.32, pp3 + o5 * 0.32, 0.5, 0.42, Color(0.32, 0.34, 0.4), rt.cross(Vector3.UP))
+					_beam_solid(prev3 + prev_o * 0.2, pp3 + o5 * 0.2, 0.7)
+					MCK.led_line(pk, kit, prev3, pp3, led_c, 0.45)
 				prev3 = pp3
+				prev_o = o5
+			for sd in [-1.0, 1.0]:
+				var fp: Vector3 = Vector3(lp.x, foot_y, lp.z) + rt * sd * 11.5
+				pk.block(kit, "tower", fp - Vector3(0.9, 0.0, 0.9), fp + Vector3(0.9, 0.7, 0.9), Color(0.22, 0.23, 0.27, float(MCK.STYLE_CLADDING) / 8.0))
+				_roof_solids.append([Transform3D(Basis(), fp + Vector3(0, 0.35, 0)), Vector3(1.8, 0.7, 1.8)])
+				MCK.led_line(pk, kit, fp + Vector3(-0.92, 0.6, -0.92), fp + Vector3(0.92, 0.6, -0.92), led_c, 0.1)
+				MCK.led_line(pk, kit, fp + Vector3(-0.92, 0.6, 0.92), fp + Vector3(0.92, 0.6, 0.92), led_c, 0.1)
 	, 3000.0)
+	# Solid: the fins, the rings and their plinths, the shell's arches and planters (the library's mesh holds glass, so
+	# DressingColliders leaves the whole batch soft).
+	var rbody := _body(level, "RoofStructuresBody")
+	for sd2 in _roof_solids:
+		_box_shape(rbody, sd2[0], sd2[1])
+	print("  roof structures: %d boxes" % _roof_solids.size())
+	_roof_solids.clear()
 	# Solid: the stack as slices of boxes (its mesh holds glass, so DressingColliders leaves it soft).
 	var body := _body(level, "LibraryBody")
 	for k13 in range(-5, 6):
@@ -747,19 +900,20 @@ func _build_hall() -> void:
 		var x1: float = hr.end.x
 		var z0: float = hr.position.y
 		var z1: float = hr.end.y
-		var entry := [entry_x - road_half - 2.4, entry_x + road_half + 2.4, Y_MALL - 4.0, Y_MALL + 4.0]
+		var eave: float = Y_MALL + HALL_EAVE
+		var entry := [entry_x - road_half - 2.4, entry_x + road_half + 2.4, Y_MALL - 4.0, Y_MALL + HALL_ENTRY_H]
 		var aqua_door := [MALL_PORTAL.x, MALL_PORTAL.y, MALL_PORTAL_Y.x, MALL_PORTAL_Y.y]
-		_x_wall(pk, kit, z0, x1, x0, HALL_FLOOR, Y_MALL + 4.0, 1.0, Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id, entry)
-		_x_wall(pk, kit, z1, x0, x1, HALL_FLOOR, Y_MALL + 4.0, -1.0, Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id + 1, aqua_door)
-		# Outside, the walls' tops stand 4m over the mall's roof round the vault: clad, an LED line along them (from the
-		# roof they had shown only their backs, which aren't drawn, and the hall stood open).
+		_x_wall(pk, kit, z0, x1, x0, HALL_FLOOR, eave, 1.0, Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id, entry)
+		_x_wall(pk, kit, z1, x0, x1, HALL_FLOOR, eave, -1.0, Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id + 1, aqua_door)
+		# Outside, the walls' tops stand `HALL_EAVE` over the mall's roof round the vault: clad, an LED line along them (from
+		# the roof they had shown only their backs, which aren't drawn, and the hall stood open).
 		var y_out0: float = Y_MALL - 0.3
-		var y_out1: float = Y_MALL + 4.0
+		var y_out1: float = eave
 		_x_wall(pk, kit, z0 - 0.05, x0, x1, y_out0, y_out1, -1.0, Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6, entry)
 		_x_wall(pk, kit, z1 + 0.05, x1, x0, y_out0, y_out1, 1.0, Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6, [])
 		MCK.wall(pk, kit, Vector3(x0 - 0.05, 0, z1), Vector3(x0 - 0.05, 0, z0), y_out0, y_out1, Vector3(-1, 0, 0), Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6)
 		MCK.wall(pk, kit, Vector3(x1 + 0.05, 0, z0), Vector3(x1 + 0.05, 0, z1), y_out0, y_out1, Vector3(1, 0, 0), Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6)
-		for e in [[Vector3(x0, y_out1 + 0.05, z0 - 0.1), Vector3(entry[0], y_out1 + 0.05, z0 - 0.1)], [Vector3(entry[1], y_out1 + 0.05, z0 - 0.1), Vector3(x1, y_out1 + 0.05, z0 - 0.1)],
+		for e in [[Vector3(x0, y_out1 + 0.05, z0 - 0.1), Vector3(x1, y_out1 + 0.05, z0 - 0.1)],
 				[Vector3(x0, y_out1 + 0.05, z1 + 0.1), Vector3(x1, y_out1 + 0.05, z1 + 0.1)], [Vector3(x0 - 0.1, y_out1 + 0.05, z0), Vector3(x0 - 0.1, y_out1 + 0.05, z1)],
 				[Vector3(x1 + 0.1, y_out1 + 0.05, z0), Vector3(x1 + 0.1, y_out1 + 0.05, z1)]]:
 			MCK.led_line(pk, kit, e[0], e[1], Color(1.0, 0.4, 0.85, 0.5), 0.3)
@@ -778,8 +932,8 @@ func _build_hall() -> void:
 		for e2 in [[Vector3(d0, dy0, fz), Vector3(d0, dy1, fz)], [Vector3(d0, dy1, fz), Vector3(d1, dy1, fz)], [Vector3(d1, dy1, fz), Vector3(d1, dy0, fz)]]:
 			MCK.led_line(pk, kit, e2[0], e2[1], Color(0.25, 0.75, 1.0, 0.0), 0.7)
 		MCK.neon_sign(pk, kit, labels, Vector3((d0 + d1) * 0.5, dy1 + 3.2, z1 - 0.4), Vector3(0, 0, -1), 22.0, 4.0, "星河海洋馆", Color(0.3, 0.85, 1.0))
-		MCK.wall(pk, kit, Vector3(x0, 0, z0), Vector3(x0, 0, z1), HALL_FLOOR, Y_MALL + 4.0, Vector3(1, 0, 0), Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id + 2)
-		MCK.wall(pk, kit, Vector3(x1, 0, z1), Vector3(x1, 0, z0), HALL_FLOOR, Y_MALL + 4.0, Vector3(-1, 0, 0), Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id + 3)
+		MCK.wall(pk, kit, Vector3(x0, 0, z0), Vector3(x0, 0, z1), HALL_FLOOR, eave, Vector3(1, 0, 0), Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id + 2)
+		MCK.wall(pk, kit, Vector3(x1, 0, z1), Vector3(x1, 0, z0), HALL_FLOOR, eave, Vector3(-1, 0, 0), Color(0.92, 0.88, 0.8), MCK.STYLE_INTERIOR, id + 3)
 		# The floor: polished stone, a fountain pool in its middle.
 		MCK.flat(pk, kit, PackedVector2Array([Vector2(x0, z0), Vector2(x1, z0), Vector2(x1, z1), Vector2(x0, z1)]), HALL_FLOOR, Vector3.UP,
 				Color(0.7, 0.66, 0.6), MCK.STYLE_CONCRETE)
@@ -807,11 +961,11 @@ func _build_hall() -> void:
 		# The glass vault over the hall: ribs and glazing, LED along the ribs.
 		var cz: float = (z0 + z1) * 0.5
 		var hw: float = (z1 - z0) * 0.5
-		var rise: float = HALL_TOP - (Y_MALL + 4.0)
+		var rise: float = HALL_TOP - eave
 		var arc: Array = []
 		for k in range(13):
 			var t: float = PI * float(k) / 12.0
-			arc.append(Vector2(cz - cos(t) * hw, Y_MALL + 4.0 + sin(t) * rise))
+			arc.append(Vector2(cz - cos(t) * hw, eave + sin(t) * rise))
 		var rx: float = x0
 		while rx <= x1 + 0.01:
 			for k2 in range(12):
@@ -833,7 +987,7 @@ func _build_hall() -> void:
 			for k4 in range(12):
 				var a4: Vector2 = arc[k4]
 				var b4: Vector2 = arc[k4 + 1]
-				pk.tri(kit, "glass", Vector3(gx, Y_MALL + 4.0, cz), Vector3(gx, a4.y, a4.x), Vector3(gx, b4.y, b4.x), Vector3(1, 0, 0), Vector3(1, 0, 0),
+				pk.tri(kit, "glass", Vector3(gx, eave, cz), Vector3(gx, a4.y, a4.x), Vector3(gx, b4.y, b4.x), Vector3(1, 0, 0), Vector3(1, 0, 0),
 						Vector3(1, 0, 0), Color(1, 1, 1), Vector3(1 if gx > x0 else -1, 0, 0))
 		# Giant LED screens at the hall's ends, lanterns strung across it, hanging over the ramps.
 		MCK.wall(pk, kit, Vector3(x0 + 0.3, 0, z0 + 18.0), Vector3(x0 + 0.3, 0, z1 - 18.0), 34.0, 66.0, Vector3(1, 0, 0), Color(0.1, 0.1, 0.14), MCK.STYLE_MEDIA, id + 4)
@@ -867,10 +1021,11 @@ func _build_hall() -> void:
 	_city("hall", func(pk: PropKit, kit: Dictionary, labels: Array) -> void:
 		for side in [-1.0, 1.0]:
 			pk.block(kit, "tower", Vector3(p.x + side * (road_half + 1.6) - 0.8, Y_MALL - 0.1, hr.position.y - 1.0),
-					Vector3(p.x + side * (road_half + 1.6) + 0.8, Y_MALL + 9.0, hr.position.y + 1.0), Color(0.25, 0.25, 0.3, 6.0 / 8.0))
-		pk.block(kit, "tower", Vector3(p.x - road_half - 2.4, Y_MALL + 9.0, hr.position.y - 1.0), Vector3(p.x + road_half + 2.4, Y_MALL + 11.0, hr.position.y + 1.0),
+					Vector3(p.x + side * (road_half + 1.6) + 0.8, Y_MALL + HALL_ENTRY_H, hr.position.y + 1.0), Color(0.25, 0.25, 0.3, 6.0 / 8.0))
+		pk.block(kit, "tower", Vector3(p.x - road_half - 2.4, Y_MALL + HALL_ENTRY_H, hr.position.y - 1.0), Vector3(p.x + road_half + 2.4, Y_MALL + HALL_EAVE, hr.position.y + 1.0),
 				Color(0.25, 0.25, 0.3, 6.0 / 8.0))
-		MCK.neon_sign(pk, kit, labels, Vector3(p.x, Y_MALL + 14.0, hr.position.y - 1.2), Vector3(0, 0, -1), 18.0, 4.5, "星河汇 入口", Color(1.0, 0.4, 0.85))
+		# The name stands on the lintel, in front of the vault's foot.
+		MCK.neon_sign(pk, kit, labels, Vector3(p.x, Y_MALL + HALL_EAVE + 2.55, hr.position.y - 1.2), Vector3(0, 0, -1), 18.0, 4.5, "星河汇 入口", Color(1.0, 0.4, 0.85))
 	, 2600.0)
 
 
@@ -1129,11 +1284,14 @@ func _build_street() -> void:
 					MCK.neon_sign(pk, kit, labels, base + Vector3(0, 8.0 + hgt * 0.5, 0), lap.fw(s) * side, 2.2, hgt, txt, col, true, 0.5)
 					k += 1
 			# Strings of lanterns across the street.
-			if int(s) % 3 == 0:
-				var l0: Vector3 = lap.pt(s) + lap.rt(s) * -14.0 + Vector3(0, 9.0, 0)
-				var l1: Vector3 = lap.pt(s) + lap.rt(s) * 14.0 + Vector3(0, 9.0, 0)
-				l0.y = 9.0
-				l1.y = 9.0
+			# Only where the road is down in the street between the fronts they hang from: over the flyover's foot, 9m up,
+			# they had hung a metre over the road.
+			if int(s) % 3 == 0 and lap.pt(s).y < 1.0:
+				var hang := 9.0
+				var l0: Vector3 = lap.pt(s) + lap.rt(s) * -14.0
+				var l1: Vector3 = lap.pt(s) + lap.rt(s) * 14.0
+				l0.y = hang
+				l1.y = hang
 				var pts: Array = _sag(l0, l1, 1.4, 10)
 				for i in range(pts.size() - 1):
 					pk.tube(kit, "matte", pts[i], pts[i + 1], 0.02, 0.02, 3, Color(0.1, 0.1, 0.1), false)

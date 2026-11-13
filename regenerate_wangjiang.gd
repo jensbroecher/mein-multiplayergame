@@ -282,6 +282,14 @@ func _place_gameplay(root: Node3D) -> void:
 #  The dressing
 # ======================================================================================
 
+## Air taxis: over the river east of the bridge, round the plaza at the finish, and over the cliff town's slope.
+const TAXI_ROUTES: Array = [
+	{"points": [Vector3(830, 62, 790), Vector3(1300, 62, 800), Vector3(1320, 64, 1200), Vector3(830, 62, 1210)], "speed": 24.0, "count": 2},
+	{"points": [Vector3(610, 66, 1345), Vector3(910, 66, 1345), Vector3(925, 68, 1460), Vector3(900, 66, 1525), Vector3(610, 66, 1525),
+		Vector3(590, 68, 1435)], "speed": 20.0, "count": 1},
+	{"points": [Vector3(1095, 106, 425), Vector3(1335, 100, 435), Vector3(1345, 82, 640), Vector3(1095, 90, 650)], "speed": 20.0, "count": 2},
+]
+
 func _build_dressing(root: Node3D) -> void:
 	_load_cjk_font()
 	_rails = _body(root, "RoadRailsBody")
@@ -307,6 +315,7 @@ func _build_dressing(root: Node3D) -> void:
 	_build_city()
 	_build_skyline(root)
 	_build_crowds()
+	_build_air_taxis(root, TAXI_ROUTES)
 	print("  dressing: %d buildings, %d people" % [_bid, _people.size()])
 
 

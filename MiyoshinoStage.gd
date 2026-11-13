@@ -1876,7 +1876,8 @@ var tree_margin := 0.0
 ## Trunks keep this far from a road's line: [kind -> metres], default `tree_clear`.
 var tree_clear := 14.0
 var tree_clear_kind := {"sakura": 13.0, "yamazakura": 13.0, "shidare": 13.0, "sugi": 11.5, "momiji": 12.0, "momiji_red": 12.0, "take": 11.0}
-## Trees placed one by one: [kind, x, z, scale, variant]; they are planted whatever stands near.
+## Trees placed one by one: [kind, x, z, scale, variant, (base y)]; they are planted whatever stands near, on the ground
+## or, given a sixth field, at that height (a roof garden's planter).
 var extra_trees: Array = []
 ## Where every tree was planted: Vector3(x, scale, z).
 var _tree_spots: Array = []
@@ -1910,7 +1911,7 @@ func _build_woods(root: Node3D) -> void:
 	rng.seed = seed_base + 41
 	var cells := {}
 	var counts := {}
-	var add := func(kind: String, variant: int, px: float, pz: float, sc: float) -> void:
+	var add := func(kind: String, variant: int, px: float, pz: float, sc: float, base_y: float) -> void:
 		var mkey: String = "%s_%d" % [kind, variant]
 		if not meshes.has(mkey):
 			var real: String = kind if miyo else String(TREE_FALLBACK.get(kind, "oak"))
@@ -1930,7 +1931,7 @@ func _build_woods(root: Node3D) -> void:
 			meshes[mkey] = [_save_res(near_m, "tree_%s" % mkey, tp), _save_res(far_m, "tree_%s_far" % mkey, tp)]
 			kinds.append(mkey)
 		var mi: int = kinds.find(mkey)
-		var g: float = _ground_at(px, pz)
+		var g: float = _ground_at(px, pz) if is_nan(base_y) else base_y + 0.3
 		var lean := Basis(Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized(), rng.randf_range(0.0, 0.05))
 		var xf := Transform3D(lean * Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sc, sc * rng.randf_range(0.92, 1.1), sc)), Vector3(px, g - 0.3, pz))
 		var key := Vector3i(floori(px / tree_cell), floori(pz / tree_cell), mi)
@@ -1941,7 +1942,7 @@ func _build_woods(root: Node3D) -> void:
 		_tree_spots.append(Vector3(px, sc, pz))
 	# Trees the stage placed one by one (avenues, a sacred tree): [kind, x, z, scale, variant].
 	for e in extra_trees:
-		add.call(String(e[0]), int(e[4]) if e.size() > 4 else 0, float(e[1]), float(e[2]), float(e[3]))
+		add.call(String(e[0]), int(e[4]) if e.size() > 4 else 0, float(e[1]), float(e[2]), float(e[3]), float(e[5]) if e.size() > 5 else NAN)
 	var step: float = tree_step
 	var x: float = fine_x.x - tree_margin + 20.0
 	while x < fine_x.y + tree_margin - 20.0:
@@ -1959,7 +1960,7 @@ func _build_woods(root: Node3D) -> void:
 				continue
 			if _slope_at(px, pz) > 0.75:
 				continue
-			add.call(kind, int(pick[2]) if pick.size() > 2 else 0, px, pz, float(pick[1]))
+			add.call(kind, int(pick[2]) if pick.size() > 2 else 0, px, pz, float(pick[1]), NAN)
 		x += step
 	var cell_r: float = tree_cell * 0.72
 	var near_end: float = 120.0 + cell_r

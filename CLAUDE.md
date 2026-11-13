@@ -4980,6 +4980,26 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   the tank, its name over it); the walls' tops over the roof are clad outside with an LED line; the south walkways (and
   their shoppers and signs) stop 14m short of the door below the floor the last ramp passes (they hung 3.5m over the
   road, as the user found).
+- The hall's walls stand `HALL_EAVE` (13m) over the mall's roof and the vault springs from their top; the way in is an
+  opening `HALL_ENTRY_H` (11m) high under the portal's lintel, its name on the lintel. The vault had sprung 4m over the
+  roof and its ribs and glass came down into the opening in front of the cars (the user saw it).
+- Things that read as floating, fixed: the LED ring tunnel over the mall roof's lap stands on plinths either side of the
+  road (steel arches, the LED on their inner faces; they had started 2m up); the supertall's crown rings are steel chords
+  from fin to fin with crossed braces (circles had touched the fins only at their tips); the library's fins are each one
+  blade swept along its curve (`_blade`; two straight beams met at a kink with their ends apart), tied to every slab.
+  All of them, the sky garden's arches and its planters are boxes in `RoofStructuresBody` (`_roof_solids`, `_beam_solid`):
+  the library's batch holds glass, so DressingColliders leaves it soft. The dark lumps in the sky garden and round the
+  library's dome are trees in lit planters now (`_planter`; MiyoshinoStage's `extra_trees` take a sixth field, the base
+  height, for a roof). The night market's lantern strings hang only where the road is down in the street (over the
+  flyover's foot, at a fixed 9m, one hung a metre over the road).
+- Air taxis (`AirTaxis.gd`, the user's idea; an original six-rotor eVTOL built in code at life size, grown by 1.6: a
+  teardrop cabin, ducts ringed with light, nav lights, a lit TAXI box, underglow in one of three liveries) fly
+  `TAXI_ROUTES` (YunhaiStage's `_build_air_taxis`; every Yunhai stage has its own) on the wall clock: 20m over the start straight, round the spiral tower, over the mall's roof and the
+  hall's vault, round the park. Each loop is smoothed through its points (`_loop_curve`); they bank by speed and turn.
+  Not solid. Their motors are `sounds/yunhai/air_taxi_loop.wav` (tools/elevenlabs `air_taxi`, raised +20dB in the file),
+  Doppler-pitched. `res://scratch/flight_path_clearance.gd` (`-s`, headless, `-- <level> [step=] [side=8] [up=5] [down=6]`)
+  checks a level's AirTaxis routes against every mesh and MultiMesh instance (all four CLEAR);
+  `res://scratch/air_taxi_preview.gd` (`-s`, windowed, `-- <dir> [night=0] name:x,y,z`) renders a taxi in its own frame.
 - The skyways from tower B to the spiral and from the spiral to tower D are glass (the user's wish): their stretches
   are sections of their own, and `_glass_roads` puts `glass_deck.gdshader` (panes on a steel grid, the city showing
   through, LED edges) on those road pieces (found by their UV.y, metres along the lap); `_deck(..., glass)` builds no
@@ -5012,6 +5032,15 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   under the lap; `_plot_tweak` per plot) and skyline (`_build_skyline`), decks (`_deck`: slab, glass or concrete
   parapets with an LED line on top, LED strips, columns kept off lower stretches of the lap by `_col_ok` and off what a
   stage's `_col_blocked` says; `pier_style` 1 for motorway hammerhead piers), roofs (`_roof`), crowd lines.
+- Air taxis on every stage (`_build_air_taxis(root, TAXI_ROUTES)` at the end of each `_build_dressing`, see Tianqiao):
+  Panlong round inside the knot over the lawns and along the start straight; Wangjiang over the river east of the bridge,
+  round the plaza inside its towers and over the cliff town; Shuangjiang along the river between the bridges, up the
+  tributary and over the riverside park. All CLEAR by `scratch/flight_path_clearance.gd` (Wangjiang's first plaza and town
+  loops clipped a plaza tower and the hillside).
+- The roads: `_road_params` sets miyoshino_road.gdshader's `city_finish` (kind 0 becomes polished dark asphalt: no centre
+  line, patches, gutter or moss, a slim white edge line inside a dark granite kerb band) and `city_reflect` (a made-up
+  reflection of a neon skyline and the lit haze in EMISSION by the reflected view ray: the Mobile renderer has no SSR and
+  the night sky reflects nothing; Shuangjiang's dawn sets it 0). Both default to 0, so the Miyoshino GP is unchanged.
 - The signs' font: `fonts/NotoSansSC-Yunhai.otf`, Noto Sans CJK SC Bold cut down to ASCII and the characters the Yunhai
   generators use. After adding a sign with new characters run `scratch/yunhai_font_subset.sh` (pyftsubset, the
   system's NotoSansCJK-Bold.ttc face 2), then regenerate. `_load_cjk_font` (in `_build_dressing`: the run clears the

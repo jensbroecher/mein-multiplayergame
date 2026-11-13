@@ -220,6 +220,14 @@ func _place_gameplay(root: Node3D) -> void:
 #  The dressing
 # ======================================================================================
 
+## Air taxis: round inside the knot over its lawns, and along the start straight and back over the knot's north side.
+const TAXI_ROUTES: Array = [
+	{"points": [Vector3(-360, 58, -340), Vector3(0, 60, -360), Vector3(320, 58, -330), Vector3(340, 60, 0), Vector3(320, 58, 260),
+		Vector3(-60, 60, 300), Vector3(-390, 58, 250), Vector3(-400, 60, -40)], "speed": 24.0, "count": 2},
+	{"points": [Vector3(-320, 44, 18), Vector3(-40, 44, 22), Vector3(220, 46, 20), Vector3(250, 48, 110), Vector3(-60, 50, 160),
+		Vector3(-360, 46, 110)], "speed": 22.0, "count": 2},
+]
+
 func _build_dressing(root: Node3D) -> void:
 	_load_cjk_font()
 	_rails = _body(root, "MotorwayRailsBody")
@@ -239,6 +247,7 @@ func _build_dressing(root: Node3D) -> void:
 	_build_city()
 	_build_skyline(root)
 	_build_crowds()
+	_build_air_taxis(root, TAXI_ROUTES)
 	print("  dressing: %d buildings, %d people" % [_bid, _people.size()])
 
 

@@ -790,5 +790,13 @@
   "duration": 2.0,
   "loop": false,
   "influence": 0.6
+ },
+ {
+  "name": "air_taxi",
+  "path": "sounds/yunhai/air_taxi_loop.wav",
+  "text": "An electric passenger air taxi drone with six rotors cruising past overhead, smooth layered electric motor whine and a soft steady multi-rotor blade hum, futuristic and clean, heard from the ground outdoors, continuous, no doppler sweep, no wind",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.55
  }
 ]

@@ -31,6 +31,14 @@ uniform vec3 plank_tint : source_color = vec3(0.58, 0.46, 0.34);
 uniform vec3 precinct_gravel : source_color = vec3(0.80, 0.78, 0.72);
 // Wet look (the misty trail): darker, glossier.
 uniform float wetness = 0.0;
+// The Yunhai GP's city roads (YunhaiStage._road_params sets 1): kind 0 becomes polished dark asphalt, glossy enough to
+// carry the neon, with no centre line, no patches, gutter or moss, a slim white line inside a dark granite kerb band.
+// 0 (every other stage) leaves the mountain road as it was.
+uniform float city_finish = 0.0;
+// Its gloss carries a made-up reflection of the lit city (EMISSION, by the reflected view ray, Fresnel-weighted): the
+// Mobile renderer has no screen-space reflections and the night sky's radiance is nearly black.
+uniform float city_reflect = 0.0;
+uniform vec3 reflect_haze : source_color = vec3(0.30, 0.16, 0.30);
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
@@ -138,7 +146,56 @@ void fragment() {
 	vec3 nw = normalize(w_nrm);
 	float petals_edge = 1.0;
 
-	if (v_kind == 0) {
+	if (v_kind == 0 && city_finish > 0.5) {
+		// ---- City road (Yunhai GP): polished dark asphalt.
+		vec3 at = texture(asphalt_tex, xz * 0.35).rgb;
+		float al = dot(at, vec3(0.33));
+		col = lin(vec3(0.11, 0.115, 0.13)) * (0.75 + al * 0.6);
+		col *= 0.92 + 0.12 * vnoise(xz / 14.0);
+		// Polished smoother along the wheel lines, a fine glint of aggregate everywhere.
+		float lane = 1.0 - smoothstep(0.6, 1.8, abs(ax - hw * 0.45));
+		float sheen = 0.5 + 0.5 * vnoise(xz / 5.0);
+		rough = mix(0.34, 0.18, lane * 0.7 + sheen * 0.3);
+		float glint = fleck(xz, 9.0, 0.012, 0.35, 21.0, fw);
+		col = mix(col, lin(vec3(0.55, 0.57, 0.62)), glint * 0.5);
+		// The kerb band: dark polished granite slabs with joints, a slim white line inside it.
+		float kb0 = hw - 0.6;
+		float kerb = smoothstep(kb0 - fx, kb0 + fx, ax);
+		vec3 gran = lin(vec3(0.13, 0.13, 0.15)) * (0.8 + 0.4 * hash12(vec2(floor(y / 1.5), sign(x))));
+		float kj = 1.0 - smoothstep(0.01, 0.025 + fy, abs(fract(y / 1.5) - 0.5) * 1.5);
+		gran *= 1.0 - 0.5 * kj * (1.0 - smoothstep(0.1, 0.4, fw));
+		col = mix(col, gran, kerb);
+		rough = mix(rough, 0.22, kerb);
+		float el = stripe(ax - (hw - 0.85), 0.14, fx);
+		col = mix(col, lin(vec3(0.88, 0.9, 0.92)), el * (1.0 - kerb));
+		rough = mix(rough, 0.45, el);
+		spec = 0.6;
+		if (city_reflect > 0.0) {
+			vec3 v = normalize(CAMERA_POSITION_WORLD - w_pos);
+			vec3 r = reflect(-v, vec3(0.0, 1.0, 0.0));
+			float ndv = clamp(v.y, 0.0, 1.0);
+			float fres = 0.1 + 0.9 * pow(1.0 - ndv, 2.0);
+			// Ripples in the polish bend the reflection a little.
+			float az = atan(r.z, r.x) / 6.2832 + (vnoise(xz * 0.5) - 0.5) * 0.0018;
+			float elev = max(r.y, 0.0);
+			// The skyline: columns of lit towers in neon colours, each its own height (the near ones reach well up the
+			// reflection, so it shows from the chase camera's height too), soft at their edges.
+			float cols = 160.0;
+			float ci = floor(az * cols);
+			float cf = fract(az * cols);
+			float hh = hash12(vec2(ci, 3.1));
+			float hgt = 0.06 + 0.6 * hh * hh;
+			float hue = hash12(vec2(ci, 7.7));
+			vec3 neon = hue < 0.35 ? vec3(1.0, 0.3, 0.8) : (hue < 0.7 ? vec3(0.3, 0.8, 1.0) : vec3(1.0, 0.75, 0.4));
+			neon = mix(vec3(0.85, 0.82, 0.75), neon, step(0.15, hash12(vec2(ci, 1.3))));
+			float tower = (1.0 - smoothstep(hgt * 0.6, hgt, elev)) * smoothstep(0.05, 0.35, cf) * smoothstep(0.95, 0.65, cf);
+			tower *= step(0.35, hash12(vec2(ci, 5.9))) * (0.4 + 0.6 * hash12(vec2(ci, 8.3)));
+			vec3 refl = lin(reflect_haze) * (1.0 - smoothstep(0.0, 1.1, elev)) * 1.2 + lin(neon) * tower * 0.6;
+			// Polished lanes reflect more, the kerb's granite a little, the paint none.
+			float gloss = (1.0 - el) * mix(0.75, 1.0, lane * 0.7 + sheen * 0.3);
+			EMISSION = refl * fres * gloss * city_reflect;
+		}
+	} else if (v_kind == 0) {
 		// ---- Mountain road.
 		vec3 at = texture(asphalt_tex, xz * 0.22).rgb;
 		float al = dot(at, vec3(0.33));

@@ -135,8 +135,25 @@ func _ground_params(m: ShaderMaterial) -> void:
 	m.set_shader_parameter("concrete_tex", load("res://materials/concrete.png"))
 
 
+## Air taxis (AirTaxis.gd) flying `routes` ([{"points": [Vector3, ...], "speed": m/s, "count": n}], closed loops smoothed
+## through their points) on the wall clock. Check each stage's with res://scratch/flight_path_clearance.gd.
+func _build_air_taxis(root: Node3D, routes: Array) -> void:
+	var n := Node3D.new()
+	n.name = "AirTaxis"
+	n.set_script(load("res://AirTaxis.gd"))
+	var rs: Array = []
+	for r in routes:
+		rs.append({"points": PackedVector3Array(r["points"]), "speed": r["speed"], "count": r["count"]})
+	n.set("routes", rs)
+	n.set("engine_sound", load("res://sounds/yunhai/air_taxi_loop.wav"))
+	n.set("engine_rms", -18.1)
+	root.add_child(n)
+
+
+## The city's roads: polished dark asphalt, no centre line (miyoshino_road.gdshader's `city_finish`).
 func _road_params(m: ShaderMaterial) -> void:
-	pass
+	m.set_shader_parameter("city_finish", 1.0)
+	m.set_shader_parameter("city_reflect", 0.8)
 
 
 func _environment() -> Dictionary:

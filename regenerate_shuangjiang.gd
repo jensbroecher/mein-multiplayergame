@@ -208,8 +208,10 @@ func _shape_heights(r: Route, ys: PackedFloat32Array) -> void:
 
 ## Dew on the roads: a little gloss, the sky in it.
 func _road_params(m: ShaderMaterial) -> void:
+	super(m)
 	m.set_shader_parameter("wetness", 0.35)
-	m.set_shader_parameter("centre_line", Color(0.95, 0.8, 0.2))
+	# Daylight: no neon skyline in the gloss.
+	m.set_shader_parameter("city_reflect", 0.0)
 
 
 func _sections(r: Route) -> Array:
@@ -290,6 +292,14 @@ func _place_gameplay(root: Node3D) -> void:
 #  The dressing
 # ======================================================================================
 
+## Air taxis: along the river between the two bridges, up the tributary, and over the riverside park by the start.
+const TAXI_ROUTES: Array = [
+	{"points": [Vector3(-500, 60, -120), Vector3(-150, 62, -140), Vector3(200, 60, -125), Vector3(225, 62, 120), Vector3(-150, 62, 140),
+		Vector3(-500, 60, 130)], "speed": 24.0, "count": 2},
+	{"points": [Vector3(620, 52, -260), Vector3(780, 54, -260), Vector3(785, 56, -700), Vector3(615, 54, -700)], "speed": 22.0, "count": 1},
+	{"points": [Vector3(-660, 42, 300), Vector3(150, 44, 300), Vector3(170, 46, 345), Vector3(-660, 44, 355)], "speed": 20.0, "count": 2},
+]
+
 func _build_dressing(root: Node3D) -> void:
 	_load_cjk_font()
 	# Morning: the windows mostly dark, the LED shows dimmed (the kit's materials are shared by everything built here).
@@ -317,6 +327,7 @@ func _build_dressing(root: Node3D) -> void:
 	_build_city()
 	_build_skyline(root)
 	_build_crowds()
+	_build_air_taxis(root, TAXI_ROUTES)
 	print("  dressing: %d buildings, %d people" % [_bid, _people.size()])
 
 
