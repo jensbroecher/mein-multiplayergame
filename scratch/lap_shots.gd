@@ -3,7 +3,8 @@ extends Node
 # Shots of a level along its lap: a chase camera behind and above the racing line at given distances
 # along the TrackPath, with a cart standing on the road for scale. Run windowed:
 #   Godot --path . res://scratch/lap_shots.tscn -- res://levels/X.tscn <out_dir> [every=N] [s=<m> ...]
-#       [high=1] [back=12] [up=4.5] [ahead=26] [nocar] [clock=<s>] [name:x,y,z:tx,ty,tz ...]
+#       [high=1] [back=12] [up=4.5] [ahead=26] [nocar] [clock=<s>] [fog=<s>] [name:x,y,z:tx,ty,tz ...]
+# fog=<s> holds a level's FogLift (Shuangjiang's morning fog) at that many seconds into its lift.
 # clock=<s> holds every Train (Freight Line) at that many seconds into the day, to shoot it where you want it.
 # every=N takes N shots evenly round the lap; s=<m> one at that distance. high=1 lifts the camera for an
 # overview of the section. Explicit name:pos:target shots work as in shots.gd.
@@ -47,6 +48,10 @@ func _ready() -> void:
 			for ch in level.find_children("*", "Node3D", true, false):
 				if "clock_override" in ch:
 					ch.clock_override = float(a.substr(6))
+		elif a.begins_with("fog="):
+			var fl: Node = level.get_node_or_null("FogLift")
+			if fl:
+				fl.set("hold_t", float(a.substr(4)))
 	var path: Path3D = level.get_node_or_null("TrackPath")
 	var length: float = path.curve.get_baked_length() if path else 0.0
 	print("LAP LENGTH ", length)

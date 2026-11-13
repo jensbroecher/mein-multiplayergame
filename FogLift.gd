@@ -13,6 +13,8 @@ extends Node
 @export var end_sky := 0.25
 @export var end_color := Color(0.78, 0.78, 0.8)
 @export var end_mist := 0.35
+## Tests and shots: hold the lift at this many seconds in, race or no race (-1: off).
+@export var hold_t := -1.0
 
 var _env: Environment
 var _from := {}
@@ -40,9 +42,12 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	var lvl: Node = get_parent()
 	var rs: Variant = lvl.get("race_state") if lvl != null else null
-	if rs is int and rs == 0:
+	if hold_t >= 0.0:
+		_t = hold_t
+	elif rs is int and rs == 0:
 		return
-	_t += delta
+	else:
+		_t += delta
 	var f: float = smoothstep(0.0, 1.0, clampf(_t / lift_time, 0.0, 1.0))
 	_env.fog_depth_end = lerpf(_from["far"], end_far, f)
 	_env.fog_depth_begin = lerpf(_from["begin"], end_begin, f)

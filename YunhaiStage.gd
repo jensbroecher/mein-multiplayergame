@@ -27,6 +27,8 @@ var city_near := 1300.0
 var skyline_r := 3600.0
 var city_mid := Vector2(380.0, 500.0)
 var city_tall := Vector2(78.0, 60.0)
+## The city's draw (`_build_city`): every stage used 9901, so their blocks came out of the same sequence.
+var city_seed := 9901
 var skyline_clusters: Array = [Vector2(-900.0, 1400.0), Vector2(1100.0, -1300.0), Vector2(2400.0, 900.0), Vector2(-1600.0, -200.0),
 	Vector2(600.0, 2600.0)]
 ## The park's lawns on the ground shader (no streets drawn there).
@@ -378,7 +380,7 @@ func _sag(a: Vector3, b: Vector3, sag: float, n: int) -> Array:
 
 func _build_city() -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 9901
+	rng.seed = city_seed
 	var count := 0
 	var i0: int = floori((-city_near + city_mid.x - grid_origin.x) / grid_cell.x)
 	var i1: int = floori((city_near + city_mid.x - grid_origin.x) / grid_cell.x)

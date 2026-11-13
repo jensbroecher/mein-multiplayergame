@@ -5137,13 +5137,18 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   stage's `_col_blocked` says; `pier_style` 1 for motorway hammerhead piers), roofs (`_roof`), crowd lines.
 - Air taxis on every stage (`_build_air_taxis(root, TAXI_ROUTES)` at the end of each `_build_dressing`, see Tianqiao):
   Panlong round inside the knot over the lawns and along the start straight; Wangjiang over the river east of the bridge,
-  round the plaza inside its towers and over the cliff town; Shuangjiang along the river between the bridges, up the
-  tributary and over the riverside park. All CLEAR by `scratch/flight_path_clearance.gd` (Wangjiang's first plaza and town
+  round the plaza inside its towers and over the cliff town; Shuangjiang along the river west of the confluence, up the
+  tributary high over the suspension bridge's cables and over the riverside park. All CLEAR by `scratch/flight_path_clearance.gd` (Wangjiang's first plaza and town
   loops clipped a plaza tower and the hillside).
 - The roads: `_road_params` sets miyoshino_road.gdshader's `city_finish` (kind 0 becomes polished dark asphalt: no centre
   line, patches, gutter or moss, a slim white edge line inside a dark granite kerb band) and `city_reflect` (a made-up
   reflection of a neon skyline and the lit haze in EMISSION by the reflected view ray: the Mobile renderer has no SSR and
   the night sky reflects nothing; Shuangjiang's dawn sets it 0). Both default to 0, so the Miyoshino GP is unchanged.
+- The ground (`megacity_ground.gdshader`, every stage): the street grid is drawn straight down from above, so on banks and
+  hillsides it smeared down the slope (the user saw it on every stage, into the river). Past `street_slope` (0.91, about
+  24 degrees) the ground turns into a bank: grass and worn earth on gentler slopes, a coursed stone revetment on steep
+  ones, both textured triplanar. `res://scratch/megacity_ground_preview.gd` (`-s`, windowed, `-- <dir>
+  [uniform=value ...]`) renders it on a made-up hill and river bank in seconds.
 - The signs' font: `fonts/NotoSansSC-Yunhai.otf`, Noto Sans CJK SC Bold cut down to ASCII and the characters the Yunhai
   generators use. After adding a sign with new characters run `scratch/yunhai_font_subset.sh` (pyftsubset, the
   system's NotoSansCJK-Bold.ttc face 2), then regenerate. `_load_cjk_font` (in `_build_dressing`: the run clears the
@@ -5219,35 +5224,53 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
 ## Shuangjiang (Yunhai GP, stage 4)
 
 - `regenerate_shuangjiang.gd` (`regenerate_shuangjiang.tscn`, headless, about 20s) builds `levels/ShuangjiangLevel.tscn`:
-  laps (about 3.85km, 85-115s) at dawn after the night race, where the main river (along z 0, banks at |z|
-  `RIVER_HALF_W` 205m) meets a tributary (along `TRIB_X`, `TRIB_HALF` 150m wide each side) from the north. The last of
-  the four ideas offered for the cup's second stage.
-- The lap: the start on the south bank's avenue (`START_AT`) heading west past the riverside park (`RIVERSIDE`); north
-  over the Jiangxin Bridge (江心大桥, `_build_arch_bridge`, a red steel through-arch along `ARCH_X`: ribs, chords, webs,
-  hangers, wind bracing over the deck, LED); down off the peninsula onto the shore road (gravel, `_sections`) at the
-  water's edge under the bluff, a kicker and a 36m jump over a sand barge moored in an inlet (`JUMP_LIP`, `INLET`); a
-  loop up over the shore road at the confluence's beach (the bluff turns north from `BLUFF_X0`, `BLUFF_RECEDE`) onto
-  the Shuangjiang Bridge (双江大桥, `_build_suspension_bridge`, along `SUSP_X`: white towers at z +-`SUSP_TOWER_Z`,
-  main cables `_cable_y` self-anchored on the deck's edges at `SUSP_END_Z`, hangers, no piers under the main span,
-  `_col_blocked`); down onto the avenue. Every stretch more than 3m over `_natural` is a bridge on hammerhead piers.
-  The loop was first tight (r60) and in a cutting into the bluff: bots flew off its bends and one drove round under it
-  for the rest of the race; it now has r80 corners on the open beach and no boost before it.
+  one point-to-point run of 5.1km (about 115-145s) at dawn after the night race, where the main river (along z 0, banks
+  at |z| `RIVER_HALF_W` 205m) meets a tributary (along `TRIB_X`, `TRIB_HALF` 150m wide each side) from the north. It was
+  a 3.85km lap until the user found it boring to drive and asked for a point-to-point race past impressive buildings,
+  more challenging (and stage 2 is a whole interchange, stage 3 has a cable car across the river and a stilt-house town,
+  so this one's spiral, gondola and old town are kept different from those).
+- The run (`corners`, heights `KNOTS` in run order, `NAT` = the natural ground there): the start on Binjiang Avenue
+  (`start_s` 180, the avenue running on behind the grid) past the Grand Theatre (云海大剧院, `_build_theatre`, `THEATRE`:
+  three raked glass halls on a stone podium, mullions and transoms, white roof blades, a prow fin); a spiral ramp (three
+  r50 corners) climbing round and over the avenue at (-600, 420), 8.3m clear, onto the Jiangxin Bridge (江心大桥,
+  `_build_arch_bridge`, a red through-arch along `ARCH_X`); a tight r35 left off it and a descending r30 chicane to the
+  shore road (gravel, `_sections`): boulders along the river side, a jump over a sand barge in its inlet and one over a
+  boat slipway (`JUMPS`: lip, gap, inlet, kicker; the inlets cut by `_natural`); the switchbacks of the old town
+  (`LEGS_Z`, `LEGS_X`: four legs 40m apart, three r18 hairpins, stone setts, steep stone-faced cuttings: `_grade_params`
+  cut 1.5) between terraces of whitewashed houses (`_build_old_town`, `_old_house`: timber frames, grey tile gables with
+  upturned ends, balconies, lanterns) and a stone stairway (`STAIR_X`) up every leg, under the gondola lift; north on the
+  heights between the first two Liangjiang towers under their sky gallery (`CRYSTAL_X`), east past the Yunhai Center
+  (`SUPERTALL_AT`, its plaza ring of flags); down the Shuangjiang Tunnel (双江隧道, 13.7%, `_build_tunnel`); the finish on
+  the Chaotian plaza (朝天广场, `_build_finish_plaza`, `PLAZA`: grandstands, flags, steps down to the water at its prow).
+- The tunnel: wherever the run lies more than `TUN_H` + 0.8 under the natural ground (`_a["tun0"]`..`["tun1"]`, found in
+  `_shape_heights`) the ground is graded down in a narrow trench (cut slope 4 from 90m before it), lined with walls,
+  walkways, a ceiling and lights (solid boxes in `TunnelLiningBody`, so the chase camera comes down under the ceiling),
+  portals with the name, and covered by a lid (`TunnelLidTerrain`, a grid at the natural ground's height in the ground's
+  own material, `TunnelLidEarth` its trimesh) so the heights carry on unbroken over it. The base has no tunnels: this is
+  how to make one.
+- The gondola lift (江岸缆车, `_build_gondola`, `GondolaLift.gd`): little red cabins going round two ropes from a station by
+  the barge (`GONDOLA_A`) over the shore road and all four legs to one on the heights (`GONDOLA_B`), two towers between;
+  every cabin placed from the wall clock, so LAN peers agree. Cable clearance over the legs 10-16m.
+- The Shuangjiang suspension bridge (双江大桥) now spans the tributary along `SUSP_Z` (scenery, `_build_suspension_bridge`):
+  towers in the water, its deck boxes solid (anyone driving off the heights onto it).
+- Collision: the batched props here (`ShoreG`, `BargesG`, `BeachG`, `LandmarksG`) are wider than DressingColliders' 400m
+  limit, so they had none (the user drove through the river's boulders). The generator gives them their own in
+  `PropsSolidBody`: a sphere per boulder, boxes for sampans, barge hulls and what stands on them, convex cones for the sand
+  heaps (driven up and over), boxes for the old town's houses, the theatre's podium, the gondola's stations and towers,
+  the Liangjiang towers' and the Yunhai Center's feet. `scratch/collision_audit.tscn ... reach=25` lists only trees'
+  crowns, the retaining wall behind the shore road's rail and things high up.
+- Daylight: the city's windows unlit, no LED shows (the tower shader's `led_energy` 0, the LED strips' `energy` 0, neon
+  dimmed), no media facades and lower, older flats near the river (`_plot_tweak`); the city's own draw (`city_seed`, which
+  YunhaiStage now takes per stage: all four stages had drawn their blocks from one seed).
 - Fog: the environment starts in thick morning fog (`_environment`: fog 25-850m, a low warm sun in the east, a pale
   sky). `FogLift.gd` (a child of the level) lifts it once the race starts (Level's `race_state` past the lobby) over
   `lift_time` (210s) to 160-2600m, and thins the river mist (`_build_mist`: `river_mist.gdshader` sheets, children
-  named "Mist...", drifting wisps that fade near the camera and where they meet things) to `end_mist` of its density;
-  each peer on its own clock. `res://scratch/fog_lift_check.tscn -- [level=] [lift=4]` (headless) prints it lifting.
-- The ground: `megacity_ground.gdshader`'s `shore_y` (3.4 here: under it gravel and mud, wetter and glossier toward
-  the water, no streets or their lamp pools or gloss) and `slope_grass` (steep ground above the shore is grass and
-  rock). Their defaults leave the other stages as they were. The roads have a little dew (`wetness`).
-- Dressing: Tianqiao's landmarks on the peninsula's heights looming out of the fog (`_build_landmarks`: the Liangjiang
-  towers with their sky gallery 云廊, the Yunhai Center supertall); the shore (`_build_shore`: a retaining wall along the
-  bluff, boulders, beached sampans, sand heaps, fishermen); the confluence's beach (`_build_beach`); barges, a container
-  barge and river cruisers (`_build_barges`); the riverside park's promenade, lamps and benches, mostly green trees
-  (`_tree_pick`); lamps along the lap; the start crowd. Mornings dim the city's windows and LEDs (the shared
-  `MCK.material` values set in `_build_dressing`). `MCK.rock_heap` is the aquarium's dark "tank" material: the boulders
-  here are `_boulders` ("paint").
-- AI races (`scratch/ai_race_test`, speed=2): every bot finishes; the only respawns are from items. The barge jump is
-  crossed at 43-50 m/s. `fall_respawn_drop` 9m.
-- Music: `STAGE_TRACKS["shuangjiang"]` (Above the Clouds, then Engines at the Gate). Menu tile: `tile_shuangjiang.jpg`, for now a
-  look shot of the arch bridge (the user skipped the tile render); `render_menu_tiles.sh Shuangjiang` makes the usual one.
+  named "Mist...", drifting wisps that fade near the camera and where they meet things); `hold_t` holds it at a time
+  (tests, shots: `scratch/lap_shots.tscn ... fog=400`). `res://scratch/fog_lift_check.tscn -- [level=] [lift=4]`
+  (headless) prints it lifting.
+- The ground: `megacity_ground.gdshader`'s `shore_y` (3.4 here: under it gravel and mud) and `slope_grass` (greener banks).
+- AI races (`scratch/ai_race_test`, speed=2): all six finish in 112-147s, the only respawns from items; the barge jump is
+  crossed at 37-48 m/s, the slipway's at 36-43. `fall_respawn_drop` 9m.
+- Music: `STAGE_TRACKS["shuangjiang"]` (Above the Clouds, then Engines at the Gate). Menu tile: `tile_shuangjiang.jpg`, a
+  look shot over the old town to the Liangjiang towers; `render_menu_tiles.sh Shuangjiang` makes the usual one (with a
+  `focus`/`radius` for a point-to-point route).
