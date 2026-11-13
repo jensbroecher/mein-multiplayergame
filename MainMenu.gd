@@ -595,6 +595,41 @@ func _clear_tiles() -> bool:
 	return false
 
 
+## A tile's slideshow (MenuTileDrift.slides): a course's own pictures of its key features
+## (`images/menu/slides/<its tile's name>_1.jpg`, `_2`, ...), or for a cup's tile (`tile_<cup>.jpg`, the cup's name in
+## lower case, spaces as underscores) its courses' pictures in turns, the first of each, then the second of each.
+## Empty where there are none: the tile keeps its single picture.
+func _tile_slides(file_name: String) -> PackedStringArray:
+	var own := _numbered_slides(file_name.get_basename())
+	if not own.is_empty():
+		return own
+	for cup in NetworkManager.GP_CUPS:
+		if "tile_" + String(cup).to_lower().replace(" ", "_") + ".jpg" != file_name:
+			continue
+		var per_stage: Array = []
+		for st in NetworkManager.GP_CUPS[cup]["stages"]:
+			var info: Dictionary = STAGE_INFO.get(st, {})
+			if info.has("file"):
+				per_stage.append(_numbered_slides(String(info["file"]).get_basename()))
+		var out := PackedStringArray()
+		for round_i in range(2):
+			for ps in per_stage:
+				if round_i < (ps as PackedStringArray).size():
+					out.append((ps as PackedStringArray)[round_i])
+		return out if out.size() > 1 else PackedStringArray()
+	return PackedStringArray()
+
+
+func _numbered_slides(stem: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	for i in range(1, 9):
+		var p := TILE_DIR + "slides/%s_%d.jpg" % [stem, i]
+		if not ResourceLoader.exists(p):
+			break
+		out.append(p)
+	return out
+
+
 func _add_tile(title: String, subtitle: String, file_name: String, accent: Color, on_press: Callable,
 		grid: GridContainer = null) -> void:
 	var btn := Button.new()
@@ -642,6 +677,11 @@ func _add_tile(title: String, subtitle: String, file_name: String, accent: Color
 	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var tex_path := TILE_DIR + file_name
+	if tex is MenuTileDrift:
+		var sl := _tile_slides(file_name)
+		if not sl.is_empty():
+			(tex as MenuTileDrift).slides = sl
+			tex_path = sl[0]
 	if not file_name.begins_with("scene:") and ResourceLoader.exists(tex_path):
 		tex.texture = load(tex_path)
 	holder.add_child(tex)
