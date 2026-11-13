@@ -288,13 +288,13 @@ func _deck(key: String, s0: float, s1: float, depth: float, led: Color, col_step
 ## the sides in `open` (0 north, 1 east, 2 south, 3 west), each an [side, from, to] stretch left open, and colliders.
 ## The sides run clockwise seen from above: north from its west end, east from its north end, south from its EAST end,
 ## west from its south end; `from`/`to` are metres along the side from where it starts.
-func _roof(r: Rect2, y: float, open: Array) -> void:
+func _roof(r: Rect2, y: float, open: Array, dots := true) -> void:
 	var plan := MCK.rect_plan(r.get_center(), r.size.x * 0.5, r.size.y * 0.5)
 	_city("roof_deck", func(pk: PropKit, kit: Dictionary, _l: Array) -> void:
 		MCK.flat(pk, kit, plan, y - 0.2, Vector3.UP, Color(0.3, 0.3, 0.33), MCK.STYLE_CONCRETE)
 		# Helipad-style markings and a walkway grid: LED dots round the edge.
 		var c: Vector2 = r.get_center()
-		for i in range(24):
+		for i in range(24 if dots else 0):
 			var a: float = TAU * float(i) / 24.0
 			var p := c + Vector2(cos(a), sin(a)) * minf(r.size.x, r.size.y) * 0.42
 			pk.block(kit, "neon", Vector3(p.x - 0.2, y - 0.06, p.y - 0.2), Vector3(p.x + 0.2, y + 0.0, p.y + 0.2), Color(0.3, 0.9, 1.0))

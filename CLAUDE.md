@@ -4983,6 +4983,11 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
 - The hall's walls stand `HALL_EAVE` (13m) over the mall's roof and the vault springs from their top; the way in is an
   opening `HALL_ENTRY_H` (11m) high under the portal's lintel, its name on the lintel. The vault had sprung 4m over the
   roof and its ribs and glass came down into the opening in front of the cars (the user saw it).
+- The hall's walls are solid (`HallWallsBody`: a metre-thick box behind each wall from the hall's floor to the eave,
+  broken round the way in and the aquarium's door); the roof round the vault (the strips either side, the part over the
+  aquarium) is `_roof`s at the roof's height with parapets on the mall's edges (`dots` false). They had been flats 14cm
+  proud of the roof with no collider and no parapet, and the walls let carts through (the user saw both). Now and then
+  a bot that runs wide past the way in drives along the north wall outside and is respawned (about one in 18).
 - Things that read as floating, fixed: the LED ring tunnel over the mall roof's lap stands on plinths either side of the
   road (steel arches, the LED on their inner faces; they had started 2m up); the supertall's crown rings are steel chords
   from fin to fin with crossed braces (circles had touched the fins only at their tips); the library's fins are each one

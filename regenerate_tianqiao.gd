@@ -596,14 +596,12 @@ func _build_mall() -> void:
 	# The roof, all but the hall's footprint (whose vault stands over it), open where the cars come in off the jump.
 	var roof_n := Rect2(m.position.x, m.position.y, m.size.x, HALL.position.y - m.position.y)
 	_roof(roof_n, Y_MALL, [[0, 300.0 - m.position.x - road_half - 1.0, 300.0 - m.position.x + road_half + 1.0], [2, 0.0, m.size.x]])
-	_city("mall", func(pk: PropKit, kit: Dictionary, _l: Array) -> void:
-		var south := PackedVector2Array([Vector2(m.position.x, HALL.end.y), Vector2(m.end.x, HALL.end.y), m.end, Vector2(m.position.x, m.end.y)])
-		MCK.flat(pk, kit, south, Y_MALL - 0.06, Vector3.UP, Color(0.3, 0.3, 0.33), MCK.STYLE_CONCRETE)
-		for side in [[m.position.x, HALL.position.x], [HALL.end.x, m.end.x]]:
-			var strip := PackedVector2Array([Vector2(side[0], HALL.position.y), Vector2(side[1], HALL.position.y), Vector2(side[1], HALL.end.y),
-				Vector2(side[0], HALL.end.y)])
-			MCK.flat(pk, kit, strip, Y_MALL - 0.06, Vector3.UP, Color(0.3, 0.3, 0.33), MCK.STYLE_CONCRETE)
-	, 3800.0)
+	# The rest of the roof round the hall's vault: the strips either side of it and the part over the aquarium, at the
+	# roof's own height and solid, with parapets on the mall's edges (drawn 14cm proud of the roof with no collider and
+	# no parapet, they had shown as a step and let carts off the edge).
+	_roof(Rect2(m.position.x, HALL.position.y, HALL.position.x - m.position.x, HALL.size.y), Y_MALL, [[0, 0.0, 999.0], [1, 0.0, 999.0], [2, 0.0, 999.0]], false)
+	_roof(Rect2(HALL.end.x, HALL.position.y, m.end.x - HALL.end.x, HALL.size.y), Y_MALL, [[0, 0.0, 999.0], [2, 0.0, 999.0], [3, 0.0, 999.0]], false)
+	_roof(Rect2(m.position.x, HALL.end.y, m.size.x, m.end.y - HALL.end.y), Y_MALL, [[0, 0.0, 999.0]], false)
 
 
 # ---- Air taxis over the course ---------------------------------------------------------------------------------------
@@ -1016,6 +1014,27 @@ func _build_hall() -> void:
 	# The ramps: decks with glass sides on columns to the hall's floor; the leg into the hall from the roof.
 	var a: Dictionary = _a
 	_deck("hall_decks", s_in - 2.0, float(a["aqua0"]) - 2.0, 1.6, Color(1.0, 0.7, 0.35, 0.0), 30.0, [true, true], HALL_FLOOR)
+	# The hall's walls are solid (its mesh holds glass, so DressingColliders leaves it soft): a metre-thick box behind each
+	# wall's inner face from the hall's floor to the eave, broken round the way in and the aquarium's door.
+	var wb := _body(level, "HallWallsBody")
+	var top: float = Y_MALL + HALL_EAVE
+	var ex0: float = entry_x - road_half - 2.4
+	var ex1: float = entry_x + road_half + 2.4
+	var walls: Array = [
+		[hr.position.y - 0.5, hr.position.x - 1.0, hr.end.x + 1.0, [ex0, ex1, Y_MALL - 4.0, Y_MALL + HALL_ENTRY_H]],
+		[hr.end.y + 0.5, hr.position.x - 1.0, hr.end.x + 1.0, [MALL_PORTAL.x, MALL_PORTAL.y, MALL_PORTAL_Y.x, MALL_PORTAL_Y.y]]]
+	for wl in walls:
+		var z: float = wl[0]
+		var xa: float = wl[1]
+		var xb: float = wl[2]
+		var h: Array = wl[3]
+		for pc in [[xa, h[0], HALL_FLOOR, top], [h[1], xb, HALL_FLOOR, top], [h[0], h[1], HALL_FLOOR, h[2]], [h[0], h[1], h[3], top]]:
+			var w: float = float(pc[1]) - float(pc[0])
+			var hh: float = float(pc[3]) - float(pc[2])
+			if w > 0.1 and hh > 0.1:
+				_box_shape(wb, Transform3D(Basis(), Vector3((float(pc[0]) + float(pc[1])) * 0.5, (float(pc[2]) + float(pc[3])) * 0.5, z)), Vector3(w, hh, 1.0))
+	for x in [hr.position.x - 0.5, hr.end.x + 0.5]:
+		_box_shape(wb, Transform3D(Basis(), Vector3(x, (HALL_FLOOR + top) * 0.5, hr.get_center().y)), Vector3(1.0, top - HALL_FLOOR, hr.size.y))
 	# A portal in the hall's north wall where the cars come in off the roof.
 	var p: Vector3 = lap.pt(s_in)
 	_city("hall", func(pk: PropKit, kit: Dictionary, labels: Array) -> void:
