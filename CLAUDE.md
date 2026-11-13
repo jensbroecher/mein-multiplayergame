@@ -4988,6 +4988,18 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   aquarium) is `_roof`s at the roof's height with parapets on the mall's edges (`dots` false). They had been flats 14cm
   proud of the roof with no collider and no parapet, and the walls let carts through (the user saw both). Now and then
   a bot that runs wide past the way in drives along the north wall outside and is respawned (about one in 18).
+  The mall's plan is square (chamfered, the roofs' square corners stood out past its walls, under their tops), the hall's
+  outer walls run to each other's faces at the corners, and YunhaiStage's `_roof` parapets reach down past the roof's
+  surface (from y - 0.1 a slot under them showed the lit facade below).
+- The drone show (`DroneShow.gd`, `drone_show.gdshader`, the user's idea; `DRONE_SHOW_AT` south-east of the park, 205m up,
+  `show_scale` 1.3, facing back toward the night market street and the run to the finish): 2,000 drones form a dragon
+  chasing its flaming pearl (its body waving), a peony, three swaying red lanterns, two koi circling among ripples, and the
+  RC Vibe GP logo (on a regular grid of its bright pixels, a dot-matrix: scattered at random the letters didn't read), 14s
+  each with 8s flights between, on the wall clock. Built at runtime from a seed; each picture's points sorted by x so a
+  drone keeps its place; the points go into a texture (a row a picture) and the shader moves every drone from INSTANCE_ID
+  and `show_time` (a quad each in one MultiMesh, additive, a minimum size by distance), so it costs the CPU nothing.
+  `res://scratch/drone_show_preview.gd` (`-s`, windowed, `-- <dir> [morph=1] [dist=420]`) renders each picture (and
+  halfway through each flight) in seconds.
 - Things that read as floating, fixed: the LED ring tunnel over the mall roof's lap stands on plinths either side of the
   road (steel arches, the LED on their inner faces; they had started 2m up); the supertall's crown rings are steel chords
   from fin to fin with crossed braces (circles had touched the fins only at their tips); the library's fins are each one

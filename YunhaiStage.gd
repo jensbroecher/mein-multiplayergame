@@ -335,8 +335,10 @@ func _roof(r: Rect2, y: float, open: Array, dots := true) -> void:
 			_city("roof_deck", func(pk: PropKit, kit: Dictionary, _l: Array) -> void:
 				var out := Vector2(dir.y, -dir.x)
 				var inn: Vector2 = -out * 0.4
-				MCK.wall(pk, kit, Vector3(pa.x, 0, pa.y), Vector3(pb.x, 0, pb.y), y - 0.1, y + 1.2, Vector3(out.x, 0, out.y), Color(0.2, 0.21, 0.24), MCK.STYLE_CLADDING, 0)
-				MCK.wall(pk, kit, Vector3(pb.x + inn.x, 0, pb.y + inn.y), Vector3(pa.x + inn.x, 0, pa.y + inn.y), y - 0.1, y + 1.2, Vector3(-out.x, 0, -out.y),
+				# Both faces run down past the roof's surface (y - 0.2): from y - 0.1 a slot under the parapet showed the lit
+				# facade below through it.
+				MCK.wall(pk, kit, Vector3(pa.x, 0, pa.y), Vector3(pb.x, 0, pb.y), y - 0.6, y + 1.2, Vector3(out.x, 0, out.y), Color(0.2, 0.21, 0.24), MCK.STYLE_CLADDING, 0)
+				MCK.wall(pk, kit, Vector3(pb.x + inn.x, 0, pb.y + inn.y), Vector3(pa.x + inn.x, 0, pa.y + inn.y), y - 0.25, y + 1.2, Vector3(-out.x, 0, -out.y),
 						Color(0.42, 0.42, 0.44), MCK.STYLE_CONCRETE, 0)
 				pk.quad(kit, "tower", [Vector3(pa.x, y + 1.2, pa.y), Vector3(pb.x, y + 1.2, pb.y), Vector3(pb.x + inn.x, y + 1.2, pb.y + inn.y),
 						Vector3(pa.x + inn.x, y + 1.2, pa.y + inn.y)], Vector3.UP, Color(0.5, 0.5, 0.52, float(MCK.STYLE_CONCRETE) / 8.0))

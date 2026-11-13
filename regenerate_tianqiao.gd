@@ -293,6 +293,7 @@ func _build_dressing(root: Node3D) -> void:
 	_build_skyline(root)
 	_build_crowds()
 	_build_air_taxis(root, TAXI_ROUTES)
+	_build_drone_show(root)
 	print("  dressing: %d buildings, %d people" % [_bid, _people.size()])
 
 
@@ -548,7 +549,8 @@ func _build_mall() -> void:
 	var m: Rect2 = MALL
 	_reserved.append(m.grow(6.0))
 	_city("mall", func(pk: PropKit, kit: Dictionary, labels: Array) -> void:
-		var plan := MCK.rect_plan(m.get_center(), m.size.x * 0.5, m.size.y * 0.5, 14.0)
+		# Square corners, as the roofs over it are (chamfered, the roofs' corners stood out past the walls, under their tops).
+		var plan := MCK.rect_plan(m.get_center(), m.size.x * 0.5, m.size.y * 0.5)
 		# The walls round (the plan runs clockwise seen from above, so out is the edge turned left), the south front
 		# left open round the portal where the aquarium's tunnel comes out onto the flyover.
 		for i in range(plan.size()):
@@ -619,6 +621,26 @@ const TAXI_ROUTES: Array = [
 	{"points": [Vector3(735, 46, 990), Vector3(900, 50, 1015), Vector3(950, 52, 1180), Vector3(840, 52, 1300), Vector3(690, 50, 1230),
 		Vector3(655, 48, 1070)], "speed": 22.0, "count": 2},
 ]
+
+
+# ---- The drone show near the finish ----------------------------------------------------------------------------------
+
+## A drone light show (DroneShow.gd, the user's idea) south-east of the park, high over the city, between the night
+## market street's view ahead and the run to the finish's: the dragon, a peony, lanterns, koi, the logo.
+const DRONE_SHOW_AT := Vector3(960.0, 205.0, 1360.0)
+const DRONE_SHOW_FACE := Vector3(700.0, 60.0, 1000.0)
+
+
+func _build_drone_show(root: Node3D) -> void:
+	var n := Node3D.new()
+	n.name = "DroneShow"
+	n.set_script(load("res://DroneShow.gd"))
+	n.set("show_scale", 1.3)
+	root.add_child(n)
+	# The pictures face +z: turn it toward the audience.
+	var to := DRONE_SHOW_FACE - DRONE_SHOW_AT
+	to.y = 0.0
+	n.transform = Transform3D(Basis.looking_at(-to.normalized(), Vector3.UP), DRONE_SHOW_AT)
 
 
 # ---- The Xinghe Library on the mall's roof ----------------------------------------------------------------------------
@@ -907,10 +929,11 @@ func _build_hall() -> void:
 		# the roof they had shown only their backs, which aren't drawn, and the hall stood open).
 		var y_out0: float = Y_MALL - 0.3
 		var y_out1: float = eave
-		_x_wall(pk, kit, z0 - 0.05, x0, x1, y_out0, y_out1, -1.0, Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6, entry)
-		_x_wall(pk, kit, z1 + 0.05, x1, x0, y_out0, y_out1, 1.0, Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6, [])
-		MCK.wall(pk, kit, Vector3(x0 - 0.05, 0, z1), Vector3(x0 - 0.05, 0, z0), y_out0, y_out1, Vector3(-1, 0, 0), Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6)
-		MCK.wall(pk, kit, Vector3(x1 + 0.05, 0, z0), Vector3(x1 + 0.05, 0, z1), y_out0, y_out1, Vector3(1, 0, 0), Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6)
+		# Each wall runs to the others' outer faces, so the corners close (they had stopped 5cm short, a lit slit up each).
+		_x_wall(pk, kit, z0 - 0.05, x0 - 0.05, x1 + 0.05, y_out0, y_out1, -1.0, Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6, entry)
+		_x_wall(pk, kit, z1 + 0.05, x1 + 0.05, x0 - 0.05, y_out0, y_out1, 1.0, Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6, [])
+		MCK.wall(pk, kit, Vector3(x0 - 0.05, 0, z1 + 0.05), Vector3(x0 - 0.05, 0, z0 - 0.05), y_out0, y_out1, Vector3(-1, 0, 0), Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6)
+		MCK.wall(pk, kit, Vector3(x1 + 0.05, 0, z0 - 0.05), Vector3(x1 + 0.05, 0, z1 + 0.05), y_out0, y_out1, Vector3(1, 0, 0), Color(0.2, 0.21, 0.25), MCK.STYLE_CLADDING, id + 6)
 		for e in [[Vector3(x0, y_out1 + 0.05, z0 - 0.1), Vector3(x1, y_out1 + 0.05, z0 - 0.1)],
 				[Vector3(x0, y_out1 + 0.05, z1 + 0.1), Vector3(x1, y_out1 + 0.05, z1 + 0.1)], [Vector3(x0 - 0.1, y_out1 + 0.05, z0), Vector3(x0 - 0.1, y_out1 + 0.05, z1)],
 				[Vector3(x1 + 0.1, y_out1 + 0.05, z0), Vector3(x1 + 0.1, y_out1 + 0.05, z1)]]:
