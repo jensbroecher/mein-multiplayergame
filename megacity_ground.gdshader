@@ -16,11 +16,23 @@ uniform sampler2D grass_tex : source_color, filter_linear_mipmap_anisotropic, re
 uniform sampler2D concrete_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float lamp_energy = 1.4;
 // Shuangjiang: ground under `shore_y` is a river's shore (gravel and mud, wetter toward the water, no streets), and with
-// `slope_grass` steep ground is grass and rock. The defaults leave the other stages as they were.
+// `slope_grass` its banks are greener.
 uniform float shore_y = -1000.0;
 uniform float slope_grass = 0.0;
+// Every stage: sloping ground carries no streets. The grid is drawn straight down from above, so on a bank or a hillside
+// its lanes, kerbs and zebras were stretched down the slope (into the river, up the hills): past `street_slope` (the
+// normal's y: about 24 degrees) the ground turns into a bank, grass on the gentler slopes, a stone revetment on the
+// steep ones, textured from the side (triplanar) so nothing stretches.
+uniform float street_slope = 0.91;
 
 varying vec3 w_pos;
+
+// A texture laid on all three axes and blended by the normal: a steep face takes it from the side, unstretched.
+vec3 tri(sampler2D t, vec3 p, vec3 n, float scale) {
+	vec3 w = pow(abs(n), vec3(4.0));
+	w /= (w.x + w.y + w.z);
+	return texture(t, p.zy / scale).rgb * w.x + texture(t, p.xz / scale).rgb * w.y + texture(t, p.xy / scale).rgb * w.z;
+}
 
 void vertex() {
 	w_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -62,8 +74,16 @@ void fragment() {
 	vec3 mud = texture(asphalt_tex, w_pos.xz / 4.0).rgb * vec3(0.32, 0.28, 0.22);
 	vec3 shore_col = mix(mud, gravel, smoothstep(0.6, 2.2, w_pos.y));
 	vec3 wn = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
-	float steep = slope_grass * (1.0 - smoothstep(0.72, 0.86, wn.y)) * smoothstep(shore_y, shore_y + 1.0, w_pos.y);
-	vec3 bank = mix(grass * 0.85, texture(concrete_tex, w_pos.xz / 5.0).rgb * vec3(0.42, 0.4, 0.36), smoothstep(0.55, 0.4, wn.y));
+	float steep = (1.0 - smoothstep(street_slope - 0.07, street_slope, wn.y)) * smoothstep(shore_y, shore_y + 1.0, w_pos.y);
+	// The bank: grass with worn earth on the gentle slopes, then stone; dressed stone in courses on the steepest, as the
+	// city's river walls and hillside revetments are.
+	vec3 tgrass = tri(grass_tex, w_pos, wn, 4.0) * mix(vec3(0.8, 0.72, 0.75), vec3(0.75), slope_grass);
+	vec3 earth = tri(asphalt_tex, w_pos, wn, 5.0) * vec3(0.95, 0.78, 0.58);
+	tgrass = mix(tgrass, earth, 0.35 * (1.0 - slope_grass));
+	vec3 stone = tri(concrete_tex, w_pos, wn, 4.0) * vec3(0.62, 0.59, 0.53);
+	float course = smoothstep(0.0, 0.04, abs(fract(w_pos.y / 0.9) - 0.5) - 0.45);
+	stone *= 1.0 - 0.25 * course * smoothstep(0.6, 0.4, wn.y);
+	vec3 bank = mix(tgrass, stone, smoothstep(0.78, 0.6, wn.y));
 	col = mix(col, shore_col, shore);
 	col = mix(col, bank, steep);
 	in_park = max(in_park, max(shore, steep));
