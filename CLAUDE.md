@@ -28,6 +28,16 @@ change the courses again: re-render a stage's tile after a big change rather tha
 generator writes a tile. `res://scratch/lap_points.gd` (`-s`, headless, `-- <level> [every=250]`) prints where a
 lap runs, to aim a focus.
 
+- Slideshows: a course's tile can go round several pictures of its key features (`images/menu/slides/<its tile's
+  name>_1.jpg`, `_2`, ..., 1280x720, close chase views and a few higher ones, not the overview), cross-fading every
+  `MenuTileDrift.SLIDE_HOLD` (5s) over `SLIDE_FADE`, each loaded on a background thread when its turn comes (headless the
+  dummy renderer never finishes that load: after 2.5s the tile waits for it), the drift running through the fades, sooner
+  under the pointer (`HOVER_RATE`). A cup's tile (`tile_<cup name, lower case, spaces as underscores>.jpg`) goes round its
+  courses' pictures in turns (`MainMenu._tile_slides`). Tiles without slides keep their single picture. The user found
+  the overviews hard to read; the Yunhai GP is the pilot (picked from `scratch/lap_shots.tscn ... every=12`, `high=1` for
+  Panlong's interchange). `res://scratch/tile_slides_test.tscn -- [tile_yunhai_gp.jpg]` (windowed, `--fixed-fps 60`)
+  prints the lists and a tile changing picture.
+
 ## The main menu's mode tiles are live 3D scenes
 
 The mode tiles (Single Player, Splitscreen, Multiplayer, Spectator, Inspect, Options, and Grand Prix, Time Trial and

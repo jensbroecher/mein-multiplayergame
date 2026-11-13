@@ -31,6 +31,7 @@ var _slide_t := 0.0
 var _next: TextureRect
 var _pending := ""
 var _fade_t := -1.0
+var _pending_t := 0.0
 
 
 func _ready() -> void:
@@ -80,11 +81,15 @@ func _advance(step: float, delta: float) -> void:
 	if _pending.is_empty():
 		_slide = (_slide + 1) % slides.size()
 		_pending = slides[_slide]
+		_pending_t = 0.0
 		if ResourceLoader.load_threaded_request(_pending) != OK:
 			_pending = ""
 		return
+	_pending_t += delta
 	var st := ResourceLoader.load_threaded_get_status(_pending)
-	if st == ResourceLoader.THREAD_LOAD_LOADED:
+	if st == ResourceLoader.THREAD_LOAD_LOADED or _pending_t > 2.5:
+		# Loaded, or still not after 2.5s (the headless dummy renderer never finishes a texture's threaded load): wait for
+		# it here, which then finishes it.
 		_next.texture = ResourceLoader.load_threaded_get(_pending) as Texture2D
 		_pending = ""
 		_fade_t = 0.0
