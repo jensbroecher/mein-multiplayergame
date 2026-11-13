@@ -2259,10 +2259,16 @@ func _physics_process(delta):
 		return
 
 	if (global_position.y < -50 or _fallen_off_heights(delta)) and not is_finished_race:
-		if multiplayer.multiplayer_peer != null and multiplayer.is_server():
-			respawn_rpc.rpc(last_checkpoint_transform)
-		elif is_local_player or (is_ai and multiplayer.multiplayer_peer == null):
+		if is_local_player:
+			# The peer driving it: the feed cuts (SignalLostOverlay), then the respawn goes out to every peer.
+			_signal_lost_respawn()
+		elif multiplayer.multiplayer_peer != null and multiplayer.is_server():
+			# A remote human's own peer handles it (above); the server steps in only if that never happens.
+			if is_ai or global_position.y < -120.0:
+				respawn_rpc.rpc(last_checkpoint_transform)
+		elif is_ai and multiplayer.multiplayer_peer == null:
 			respawn() # single-player / host fallback
+	_update_out_of_bounds(delta)
 
 	var has_physics_authority = has_physics_authority()
 	# Safety net for discrete physics steps: recover if we punched through terrain while falling.
@@ -5130,6 +5136,157 @@ func _fallen_off_heights(delta: float) -> bool:
 	return global_position.y < p.y - _fall_drop
 
 
+## Out of bounds, on every stage: the cart is lost when nothing is under it within OOB_VOID_DEPTH (it went off the
+## map's edge or fell through the ground; the level's water counts as ground) for OOB_VOID_TIME, when it is more than
+## OOB_DROP under the nearest point of the lap (the level root's `fall_respawn_drop` meta, where set, is stricter: see
+## above), or, for a human, when it is further than the level's `oob_reach` meta (default OOB_REACH) from every lap path
+## (the TrackPath and the shortcuts; not in an arena). Past the reach the feed breaks up over OOB_GRACE as a warning
+## (SignalLostOverlay.weak): turning back clears it, driving on cuts it. A human's feed cuts and it respawns behind the cut
+## (_signal_lost_respawn); a bot just respawns. Checked every OOB_CHECK_EVERY by the peer with the cart's physics.
+const OOB_CHECK_EVERY := 0.15
+const OOB_VOID_DEPTH := 350.0
+const OOB_VOID_TIME := 0.45
+const OOB_DROP := 60.0
+const OOB_REACH := 230.0
+const OOB_GRACE := 45.0
+var _oob_t := 0.0
+var _oob_void := 0.0
+var _oob_reach := -1.0
+var _signal_lost_active := false
+## Set by _signal_lost_respawn on the peer whose feed was cut: its next respawn skips the teleport animation.
+var _quick_respawn := false
+
+
+func _update_out_of_bounds(delta: float) -> void:
+	if not has_physics_authority() or is_teleporting or is_finished_race or is_exploding or _signal_lost_active:
+		if is_local_player and race_ui and race_ui.has_method("set_signal_weak"):
+			race_ui.set_signal_weak(0.0)
+		return
+	_oob_t += delta
+	if _oob_t < OOB_CHECK_EVERY:
+		return
+	var dt: float = _oob_t
+	_oob_t = 0.0
+	var reason := ""
+	# Nothing under the cart: off the map's edge, or through the ground.
+	if _nothing_below():
+		_oob_void += dt
+		if _oob_void >= OOB_VOID_TIME:
+			reason = "void"
+	else:
+		_oob_void = 0.0
+	# Far from the course: by its nearest lap path in 3D, and how far under it.
+	var weak := 0.0
+	var near: Vector3 = _nearest_lap_point()
+	if near.is_finite():
+		if global_position.y < near.y - OOB_DROP:
+			reason = "drop"
+		if is_local_player and not _in_arena():
+			if _oob_reach < 0.0:
+				var lvl: Node = _cached_level if is_instance_valid(_cached_level) else null
+				_oob_reach = float(lvl.get_meta(&"oob_reach", OOB_REACH)) if lvl != null else OOB_REACH
+			var d: float = global_position.distance_to(near)
+			weak = clampf((d - _oob_reach) / OOB_GRACE, 0.0, 1.0)
+			if weak >= 1.0:
+				reason = "far"
+	if is_local_player and race_ui and race_ui.has_method("set_signal_weak"):
+		race_ui.set_signal_weak(weak)
+	if reason.is_empty():
+		return
+	print("[OutOfBounds] ", name, " ", reason, " at ", global_position)
+	_oob_void = 0.0
+	if is_local_player:
+		_signal_lost_respawn()
+	elif multiplayer.multiplayer_peer != null and multiplayer.is_server():
+		respawn_rpc.rpc(last_checkpoint_transform)
+	elif multiplayer.multiplayer_peer == null:
+		respawn()
+
+
+func _in_arena() -> bool:
+	var lvl: Node = _cached_level if is_instance_valid(_cached_level) else null
+	return lvl != null and "arena" in lvl and lvl.arena != null
+
+
+## True when a ray straight down finds nothing solid within OOB_VOID_DEPTH and there is no water under the cart either.
+func _nothing_below() -> bool:
+	var world := get_world_3d()
+	if world == null:
+		return false
+	var from: Vector3 = global_position + Vector3.UP * 0.5
+	var q := PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * OOB_VOID_DEPTH)
+	q.exclude = [get_rid()]
+	q.collision_mask = 1
+	if not world.direct_space_state.intersect_ray(q).is_empty():
+		return false
+	return not _water_under(global_position)
+
+
+## The level's water under p (not too far below it): it counts as ground for the void check (Harbor Pier's sea and the
+## Rhine have no bed under them).
+func _water_under(p: Vector3) -> bool:
+	if not stage_has_water:
+		return false
+	var wy: float = water_surface_y
+	if _river_water and is_instance_valid(_river_water) and _river_water.has_method("surface_at"):
+		var r = _river_water.call("surface_at", p.x, p.z)
+		if not (r is float) or is_nan(r):
+			return false
+		wy = r
+	elif water_bounds_active and (p.x < water_bounds_min.x or p.x > water_bounds_max.x or p.z < water_bounds_min.y or p.z > water_bounds_max.y):
+		return false
+	return p.y > wy - 4.0
+
+
+## The nearest point on the lap's paths (TrackPath and the shortcuts) in 3D, or INF if the level has none.
+func _nearest_lap_point() -> Vector3:
+	var best := Vector3.INF
+	var best_d := INF
+	var paths: Array = []
+	if track_path != null:
+		paths.append(track_path)
+	for ap in alternative_paths:
+		paths.append(ap)
+	for path in paths:
+		if not is_instance_valid(path) or path.curve == null or path.curve.point_count < 2:
+			continue
+		var c: Curve3D = path.curve
+		var q: Vector3 = path.to_global(c.get_closest_point(path.to_local(global_position)))
+		var d: float = q.distance_squared_to(global_position)
+		if d < best_d:
+			best_d = d
+			best = q
+	return best
+
+
+## The local human left the course: its feed cuts (the RaceUI's SignalLostOverlay), the cart holds still, and once the
+## static is up it respawns at its last checkpoint on every peer; the feed comes back as it reappears.
+func _signal_lost_respawn() -> void:
+	if _signal_lost_active or is_teleporting or is_finished_race:
+		return
+	_signal_lost_active = true
+	if has_physics_authority():
+		freeze = true
+		linear_velocity = Vector3.ZERO
+		angular_velocity = Vector3.ZERO
+	var delay := 0.38
+	if race_ui and race_ui.has_method("signal_lost"):
+		var cam_n: int = 2 if input_prefix == "p2_" else 1
+		delay = float(race_ui.signal_lost("CAM %d" % cam_n))
+	get_tree().create_timer(delay).timeout.connect(func():
+		if not is_instance_valid(self):
+			return
+		_signal_lost_active = false
+		if is_finished_race:
+			return
+		_quick_respawn = true
+		if multiplayer.multiplayer_peer != null:
+			respawn_rpc.rpc(last_checkpoint_transform)
+		else:
+			respawn()
+	)
+
+
 func respawn():
 	_snow_drift_depth = 0
 	_active_drifts.clear()
@@ -5147,6 +5304,19 @@ func _start_respawn_teleport() -> void:
 		freeze = true
 		linear_velocity = Vector3.ZERO
 		angular_velocity = Vector3.ZERO
+	# Behind the signal-lost cut the cart is just put back: the vanish and the glowing reappearance would still be
+	# playing as the feed returned.
+	if _quick_respawn:
+		_quick_respawn = false
+		if _teleport_tween:
+			_teleport_tween.kill()
+		_apply_respawn_pose()
+		_chase_yaw = NAN
+		_topdown_lead = Vector3.ZERO
+		_topdown_lead_vel = Vector3.ZERO
+		visuals.visible = true
+		_teleport_finish()
+		return
 	if _teleport_tween:
 		_teleport_tween.kill()
 	_teleport_tween = create_tween()

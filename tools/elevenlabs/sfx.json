@@ -798,5 +798,21 @@
   "duration": 8.0,
   "loop": true,
   "influence": 0.55
+ },
+ {
+  "name": "signal_lost",
+  "path": "sounds/ui/signal_lost.wav",
+  "text": "A digital video feed cutting out: a short burst of stuttering digital glitch noise and data corruption chirps, a brief electronic buzz, then it drops into soft quiet white-noise static that fades away, clean and dry, no music",
+  "duration": 2.0,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "signal_restore",
+  "path": "sounds/ui/signal_restore.wav",
+  "text": "A digital video feed reconnecting: a quick rising electronic chirp and two short glitch stutters, then a clean soft confirmation blip, very short, dry, no music",
+  "duration": 1.0,
+  "loop": false,
+  "influence": 0.6
  }
 ]

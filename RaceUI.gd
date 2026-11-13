@@ -28,6 +28,30 @@ func set_underwater(is_underwater: bool):
 	if underwater_overlay:
 		underwater_overlay.visible = is_underwater
 
+## The camera feed's "signal lost" (SignalLostOverlay.gd), made on first use under the HUD: `signal_lost` runs the cut
+## and returns when the cart should be moved (the static is up by then); `set_signal_weak` breaks the picture up a little.
+const SignalLostOverlay = preload("res://SignalLostOverlay.gd")
+var _signal_overlay: Control = null
+
+func _signal_overlay_node() -> Control:
+	if _signal_overlay == null:
+		_signal_overlay = SignalLostOverlay.new()
+		_signal_overlay.name = "SignalLost"
+		add_child(_signal_overlay)
+		move_child(_signal_overlay, 0)
+	return _signal_overlay
+
+func signal_lost(camera_label := "CAM 1") -> float:
+	var o := _signal_overlay_node()
+	o.set("camera_label", camera_label)
+	o.call("cut")
+	return SignalLostOverlay.RESPAWN_AT
+
+func set_signal_weak(amount: float) -> void:
+	if _signal_overlay == null and amount <= 0.0:
+		return
+	_signal_overlay_node().call("weak", amount)
+
 func set_terrain_clipped(is_clipped: bool):
 	_terrain_clip_target = 1.0 if is_clipped else 0.0
 	if terrain_clip_overlay and not is_clipped and _terrain_clip_alpha <= 0.001:

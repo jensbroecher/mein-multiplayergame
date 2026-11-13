@@ -1700,6 +1700,29 @@ shapes stay whole. To measure a level, run `res://scratch/bench.tscn` windowed:
 `-- res://levels/X.tscn samples=12 [chunk=80] [omni=0] [spot=0] [shadows=N] [hide=<path>] [shot=<dir>]`.
 In zsh, split a variable that holds several args with `${=args}`.
 
+## Out of bounds: the signal-lost cut
+
+- On every stage (`PlayerCart._update_out_of_bounds`, every `OOB_CHECK_EVERY` by the peer with the cart's physics) a cart is
+  lost when nothing solid is under it within `OOB_VOID_DEPTH` for `OOB_VOID_TIME` (off the map's edge, or through the
+  ground; the level's water counts as ground, `_water_under`: Harbor Pier's sea and the Rhine have no bed), when it is
+  `OOB_DROP` (60m) under the nearest point of the lap's paths (`fall_respawn_drop`, where a level sets it, is stricter), or,
+  a human, further than the level root's `oob_reach` meta (default `OOB_REACH` 230m) from every lap path (TrackPath and
+  shortcuts; never in an arena). Past the reach the feed breaks up over `OOB_GRACE` (45m) with WEAK SIGNAL - RETURN TO THE
+  COURSE: turning back clears it. A bot just respawns.
+- A human's feed cuts (`_signal_lost_respawn`; the y < -50 and `fall_respawn_drop` falls too): `SignalLostOverlay.gd`, added
+  by RaceUI under its HUD on first use (`signal_lost`, `set_signal_weak`; one per split-screen view), draws
+  `signal_lost.gdshader` over the 3D view: tear bands, shuffled and dead blocks, colour split, scanlines and grain, then
+  dark digital static with SIGNAL LOST, CAM n and RECONNECTING (patterns step at 12 a second, nothing flashes bright: motion
+  comfort). The cart holds still, respawns at `RESPAWN_AT` (0.38s, the static up) without the teleport animation
+  (`_quick_respawn`), and the picture glitches back in at 1.5s. Sounds `sounds/ui/signal_lost.wav` and `signal_restore.wav`
+  (tools/elevenlabs). In a network game the owning peer cuts and sends `respawn_rpc`; the server only steps in for a remote
+  human under y -120.
+- `res://scratch/out_of_bounds_test.tscn -- [level=] [drive=20]` (headless) puts the human's cart just past the reach (the
+  warning, no respawn), well past it, off the map in the air and under the ground (each a cut and a respawn), then drives
+  the lap (nothing may fire); on stages whose ground ends before the reach the first two are skipped.
+  `res://scratch/signal_lost_shots.tscn -- <dir> [level=] [times=...] [weak=0.7]` (windowed, `--fixed-fps 60`) photographs
+  the warning and the cut.
+
 ## Cars climbing small edges
 
 The cart is one sphere, so the solver deflects it upward off any lip, and at racing speed a 1cm seam
