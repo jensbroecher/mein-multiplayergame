@@ -667,6 +667,9 @@ func display_race_results(results_data: Array):
 	elif NetworkManager.current_game_mode == NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL:
 		_build_tt_results(results_data)
 	else:
+		var end_title := get_node_or_null("EndPanel/VBoxContainer/LabelFinished") as Label
+		if end_title:
+			end_title.text = "Race Finished!"
 		_build_results_table(results_data, is_gp)
 
 	# Post-race track voting for multiplayer single stages (not after an arena match):
@@ -1251,6 +1254,10 @@ func _build_results_table(results_data: Array, is_gp: bool) -> void:
 ## claimed), the winning team's line first in a team game.
 func _build_arena_results(results_data: Array) -> void:
 	var first: Dictionary = results_data[0]
+	# An arena game is a match, not a race (the panel's title is the scene's "Race Finished!").
+	var title := get_node_or_null("EndPanel/VBoxContainer/LabelFinished") as Label
+	if title:
+		title.text = "Match Finished!"
 	if str(first.get("headline", "")) != "":
 		var head := _results_label(str(first["headline"]), 0, HORIZONTAL_ALIGNMENT_CENTER, COL_T_GOLD)
 		head.add_theme_font_size_override("font_size", 26)

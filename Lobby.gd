@@ -99,8 +99,8 @@ func _setup_mode_options():
 ## The lobby's arena entries: [label, kind, teams], their ids ARENA_ID0 on.
 const ARENA_ID0 := 100
 const ARENA_MODES := [
-	["Arena: Football (All vs All)", "football", false],
-	["Arena: Football (Teams)", "football", true],
+	["Arena: Hex Bowl (All vs All)", "football", false],
+	["Arena: Hex Bowl (Teams)", "football", true],
 	["Arena: Capture the Flag (All vs All)", "ctf", false],
 	["Arena: Capture the Flag (Teams)", "ctf", true],
 ]
@@ -241,7 +241,7 @@ func _on_multiplayer_mode_changed(mode: int, cup_name: String):
 
 func _update_client_mode_label():
 	if not NetworkManager.arena.is_empty():
-		var kind: String = "Football" if str(NetworkManager.arena.get("kind", "")) == "football" else "Capture the Flag"
+		var kind: String = "Hex Bowl" if str(NetworkManager.arena.get("kind", "")) == "football" else "Capture the Flag"
 		client_mode_label.text = "Mode: Arena - %s (%s)" % [kind, "Teams" if bool(NetworkManager.arena.get("teams", false)) else "All vs All"]
 	elif NetworkManager.multiplayer_mode == NetworkManager.MultiplayerMode.GRAND_PRIX:
 		client_mode_label.text = "Mode: Grand Prix - %s" % NetworkManager.selected_mp_cup

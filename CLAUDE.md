@@ -1232,6 +1232,10 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   course (`time_trial_stage` offline, `current_single_stage`'s place in a LAN game). Main registers every course and
   arena with the LevelSpawner at start-up (`_register_spawnable_levels`): Main.tscn lists only the first ten courses, so
   a LAN game on any later one never reached the clients.
+- The menus and the lobby call the football game Hex Bowl ("HEX BOWL • ALL VS ALL", "Arena: Hex Bowl (Teams)": the
+  user's wording; the code's kind stays "football"), and an arena's end panel says "Match Finished!"
+  (`RaceUI._build_arena_results`; the scene's title is the races' "Race Finished!").
+  `res://scratch/arena_end_title_check.tscn -- [football|ctf] [seconds=4]` (headless) checks both.
 - `ArenaGame.gd` (a child "ArenaGame" of an arena level) runs the match: Level.gd finds it (`arena`) and then fills the
   field with bots in every mode (`_fill_arena_bots`), skips the laps, gates, timing and commentator, spawns the item
   boxes at its "ItemSpots", calls `on_race_started` at the green light, ends with `end_arena(results)` (RaceUI's

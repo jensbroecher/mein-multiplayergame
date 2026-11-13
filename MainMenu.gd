@@ -432,7 +432,7 @@ func _build_page(menu_name: String) -> void:
 			_add_tile("TIME TRIAL", "Solo laps on any course", "scene:time_trial", COL_CYAN, func():
 				show_sub_menu("stage_select")
 			)
-			_add_tile("ARENA", "Football in the Hex Bowl or Capture the Flag, against bots", "tile_arena_football.jpg", COL_ARENA, func():
+			_add_tile("ARENA", "Hex Bowl or Capture the Flag, against bots", "tile_arena_football.jpg", COL_ARENA, func():
 				show_sub_menu("arena_select")
 			)
 		"coop_config":
@@ -442,7 +442,7 @@ func _build_page(menu_name: String) -> void:
 			tile_grid.columns = 2
 			_add_tile("GRAND PRIX", "Share a cup with bots in the field", "scene:grand_prix", COL_GOLD, _on_coop_gp_pressed)
 			_add_tile("VS RACE", "Head-to-head on a single course", "scene:vs", COL_ORANGE, _on_coop_vs_pressed)
-			_add_tile("ARENA", "Football or Capture the Flag, with bots filling the field", "tile_arena_football.jpg", COL_ARENA, func():
+			_add_tile("ARENA", "Hex Bowl or Capture the Flag, with bots filling the field", "tile_arena_football.jpg", COL_ARENA, func():
 				NetworkManager.current_game_mode = NetworkManager.GameMode.LOCAL_COOP
 				NetworkManager.is_coop_gp = false
 				show_sub_menu("arena_select")
@@ -451,10 +451,10 @@ func _build_page(menu_name: String) -> void:
 			screen_title.text = "ARENA"
 			screen_subtitle.text = "Pick a game: every player for themselves, or two teams"
 			tile_grid.columns = 2
-			_add_tile("FOOTBALL  •  ALL VS ALL", "The Hex Bowl: six goals, one each. Score in the others' and guard your own", "tile_arena_football.jpg", COL_ARENA, func():
+			_add_tile("HEX BOWL  •  ALL VS ALL", "Car football with six goals, one each. Score in the others' and guard your own", "tile_arena_football.jpg", COL_ARENA, func():
 				_on_arena_selected("football", false)
 			)
-			_add_tile("FOOTBALL  •  TEAMS", "The Hex Bowl: red against blue, three goals each", "tile_arena_football.jpg", COL_ARENA, func():
+			_add_tile("HEX BOWL  •  TEAMS", "Car football, red against blue, three goals each", "tile_arena_football.jpg", COL_ARENA, func():
 				_on_arena_selected("football", true)
 			)
 			_add_tile("CAPTURE THE FLAG  •  ALL VS ALL", "Grab the flag in the middle and claim bases with it: every base you hold scores", "tile_arena_ctf.jpg", COL_ARENA_CTF, func():
