@@ -10,8 +10,14 @@ var option_camera_mode: OptionButton
 var option_shadows: OptionButton
 var option_commentary: OptionButton
 
+const HS = preload("res://HudStyle.gd")
+
 func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# The race screens' look (HudStyle.gd), shared with the end panel.
+	theme = HS.theme()
+	$Panel.add_theme_stylebox_override("panel", HS.panel_style())
+	HS.title($Panel/MarginContainer/VBoxContainer/TitleLabel)
 	
 	# Load current values from MusicManager
 	music_slider.value = MusicManager.music_volume
@@ -99,6 +105,15 @@ func show_pause_menu():
 		btn_restart.show()
 	
 	show()
+	_fit_panel()
+
+## The panel as tall as what's in it (it was a fixed 600 with a gap under the buttons).
+func _fit_panel() -> void:
+	var panel := $Panel as Control
+	var h: float = ($Panel/MarginContainer as Control).get_combined_minimum_size().y
+	panel.custom_minimum_size.y = 0.0
+	panel.offset_top = -h * 0.5
+	panel.offset_bottom = h * 0.5
 
 func _on_music_value_changed(value: float):
 	MusicManager.set_music_volume(value)

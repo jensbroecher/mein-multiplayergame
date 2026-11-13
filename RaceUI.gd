@@ -76,7 +76,7 @@ func _process(delta: float) -> void:
 
 @onready var end_panel = $EndPanel
 ## The "RACE ENDING" countdown: a slim panel at the top of the screen, so the road stays visible.
-## The score table ("Race Finished!") is end_panel, in the middle, and only shows once the race is over.
+## The score table (RACE FINISHED) is end_panel, in the middle, and only shows once the race is over.
 @onready var end_countdown = $EndCountdown
 @onready var end_countdown_label = $EndCountdown/HBoxContainer/LabelCount
 ## How far "You Finished!" and the other messages step down while the countdown is up.
@@ -103,6 +103,8 @@ var style_slot_backup = StyleBoxFlat.new()
 ## The items' symbols (ItemSymbols.gd, drawn by ItemSymbolIcon.gd): the same white outlines the
 ## item boxes show, in the item slots and the kill feed.
 const ItemSymbolIcon = preload("res://ItemSymbolIcon.gd")
+## Fonts, outlines and the panels' look, shared with the pause menu (HudStyle.gd).
+const HS = preload("res://HudStyle.gd")
 const ItemSymbols = preload("res://ItemSymbols.gd")
 var slot1_symbol: Control
 var slot2_symbol: Control
@@ -121,6 +123,7 @@ func _ready():
 	_setup_killfeed()
 	_msg_top = label_msg.offset_top
 	_msg_bottom = label_msg.offset_bottom
+	_style_screens()
 
 	NetworkManager.stage_votes_updated.connect(_on_stage_votes_updated)
 	NetworkManager.stage_voting_concluded.connect(_on_stage_voting_concluded)
@@ -220,15 +223,142 @@ func show_hud():
 	hud_panel.show()
 
 func update_hud(pos: int, total: int, lap: int, max_laps: int, progress: float = -1.0):
-	label_pos.text = "%d" % pos
+	if pos != _place_shown:
+		_place_shown = pos
+		label_pos.text = "%d" % pos
+		var col: Color = PLACE_COLORS[pos - 1] if pos >= 1 and pos <= PLACE_COLORS.size() else Color.WHITE
+		label_pos.add_theme_color_override("font_color", col)
+		if _pos_suffix:
+			_pos_suffix.text = _ordinal(pos)
+			_pos_suffix.add_theme_color_override("font_color", col)
 	label_pos_total.text = "/ %d" % total
 	if max_laps <= 1:
 		if progress >= 0.0:
-			label_lap.text = "STAGE: %d%%" % int(clampf(progress * 100.0, 0.0, 100.0))
+			label_lap.text = "STAGE %d%%" % int(clampf(progress * 100.0, 0.0, 100.0))
 		else:
 			label_lap.text = "STAGE"
 	else:
-		label_lap.text = "Lap: %d/%d" % [lap, max_laps]
+		label_lap.text = "LAP %d/%d" % [lap, max_laps]
+
+
+## The HUD's place colours: gold, silver and bronze for the podium, white below it.
+const PLACE_COLORS := [Color(1.0, 0.8, 0.25), Color(0.84, 0.88, 0.94), Color(0.93, 0.6, 0.32)]
+var _place_shown := -1
+var _pos_suffix: Label = null
+## The speed in three fixed cells (Russo One's digits differ in width, and a right-aligned number jittered).
+var _speed_digits: Array[Label] = []
+var _speed_shown := -1
+var _end_dim: ColorRect = null
+var _end_buttons_sep: HSeparator = null
+
+
+func _ordinal(n: int) -> String:
+	if n % 100 >= 11 and n % 100 <= 13:
+		return "TH"
+	match n % 10:
+		1: return "ST"
+		2: return "ND"
+		3: return "RD"
+	return "TH"
+
+
+## The race's look (HudStyle.gd): the theme on every screen, outlined display numbers over the 3D view, and the end
+## panel dressed as the pause menu (its panel, a dim behind it, the title in the display font, separators).
+func _style_screens() -> void:
+	for c in [hud_panel, end_panel, end_countdown, lobby_panel]:
+		if c:
+			c.theme = HS.theme()
+	# The place: the number with its ordinal beside it, "/ N" under them.
+	var pc := label_pos.get_parent() as VBoxContainer
+	pc.add_theme_constant_override("separation", -14)
+	var row := HBoxContainer.new()
+	row.name = "PlaceRow"
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 3)
+	pc.add_child(row)
+	pc.move_child(row, 0)
+	label_pos.reparent(row, false)
+	HS.outline(label_pos, HS.display(), 76, 13)
+	_pos_suffix = Label.new()
+	_pos_suffix.name = "LabelOrdinal"
+	_pos_suffix.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	HS.outline(_pos_suffix, HS.display(), 30, 8)
+	var sup := MarginContainer.new()
+	sup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sup.add_theme_constant_override("margin_top", 14)
+	sup.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	sup.add_child(_pos_suffix)
+	row.add_child(sup)
+	HS.outline(label_pos_total, HS.bold(), 24, 7, Color(0.88, 0.91, 0.96))
+	label_pos_total.text = "/ 1"
+	_place_shown = -1
+	update_hud(1, 1, 1, 3)
+	HS.outline(label_lap, HS.bold(), 28, 8)
+	HS.outline(label_msg, HS.display(), 36, 10)
+	# The speed: three digit cells and the unit.
+	label_speed.hide()
+	var speedo := HBoxContainer.new()
+	speedo.name = "Speedo"
+	speedo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	speedo.anchor_left = 1.0
+	speedo.anchor_right = 1.0
+	speedo.anchor_top = 1.0
+	speedo.anchor_bottom = 1.0
+	speedo.offset_left = -24.0
+	speedo.offset_right = -24.0
+	speedo.offset_top = -12.0
+	speedo.offset_bottom = -12.0
+	speedo.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	speedo.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	speedo.add_theme_constant_override("separation", 0)
+	var size := 60
+	var cell := ceilf(HS.display().get_string_size("0", HORIZONTAL_ALIGNMENT_LEFT, -1, size).x) + 2.0
+	for i in 3:
+		var d := Label.new()
+		d.custom_minimum_size = Vector2(cell, 0)
+		d.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		HS.outline(d, HS.display(), size, 12)
+		speedo.add_child(d)
+		_speed_digits.append(d)
+	var unit := Label.new()
+	unit.text = "KM/H"
+	unit.size_flags_vertical = Control.SIZE_SHRINK_END
+	HS.outline(unit, HS.bold(), 24, 7, Color(0.88, 0.91, 0.96))
+	var um := MarginContainer.new()
+	um.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	um.size_flags_vertical = Control.SIZE_SHRINK_END
+	um.add_theme_constant_override("margin_left", 8)
+	um.add_theme_constant_override("margin_bottom", 10)
+	um.add_child(unit)
+	speedo.add_child(um)
+	hud_panel.add_child(speedo)
+	update_speed(0.0)
+	# The countdown's panel.
+	var ending := end_countdown.get_node("HBoxContainer/LabelEnding") as Label
+	ending.add_theme_font_override("font", HS.bold())
+	end_countdown_label.add_theme_font_override("font", HS.display())
+	end_countdown_label.add_theme_font_size_override("font_size", 64)
+	# The end panel: the pause menu's panel and title, over a dim.
+	end_panel.add_theme_stylebox_override("panel", HS.panel_style())
+	var vb := end_panel.get_node("VBoxContainer") as VBoxContainer
+	vb.add_theme_constant_override("separation", 15)
+	var title := vb.get_node("LabelFinished") as Label
+	HS.title(title)
+	title.text = "RACE FINISHED"
+	var sep := HSeparator.new()
+	vb.add_child(sep)
+	vb.move_child(sep, 1)
+	_end_buttons_sep = HSeparator.new()
+	vb.add_child(_end_buttons_sep)
+	_end_buttons_sep.hide()
+	_end_dim = ColorRect.new()
+	_end_dim.name = "EndDim"
+	_end_dim.color = Color(0.039, 0.039, 0.059, 0.5)
+	_end_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_end_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_end_dim.visible = false
+	add_child(_end_dim)
+	move_child(_end_dim, end_panel.get_index())
 
 func _setup_standings_list() -> void:
 	if hud_panel == null:
@@ -236,7 +366,7 @@ func _setup_standings_list() -> void:
 	standings_panel = PanelContainer.new()
 	standings_panel.name = "StandingsPanel"
 	standings_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	standings_panel.position = Vector2(16, 126)
+	standings_panel.position = Vector2(16, 140)
 	standings_panel.custom_minimum_size = Vector2(196, 0)
 
 	var style := StyleBoxFlat.new()
@@ -609,6 +739,8 @@ func update_items(item1_name: String, item2_name: String):
 ## The score table. It replaces the countdown.
 func show_end_screen():
 	hide_end_countdown()
+	if _end_dim:
+		_end_dim.show()
 	end_panel.show()
 
 ## Seconds until the race is called, from the first finisher on. Shows the countdown.
@@ -630,8 +762,16 @@ func _shift_message(down: float) -> void:
 	label_msg.offset_bottom = _msg_bottom + down
 
 func update_speed(val_kmh: float):
+	var v := clampi(int(absf(val_kmh)), 0, 999)
+	if v == _speed_shown:
+		return
+	_speed_shown = v
 	if label_speed:
-		label_speed.text = "%d KM/H" % int(val_kmh)
+		label_speed.text = "%d KM/H" % v
+	var s := str(v)
+	for i in _speed_digits.size():
+		var k := i - (_speed_digits.size() - s.length())
+		_speed_digits[i].text = s[k] if k >= 0 else ""
 
 
 var results_container: VBoxContainer = null
@@ -655,9 +795,9 @@ func display_race_results(results_data: Array):
 	var vbox = $EndPanel/VBoxContainer
 	if results_container == null:
 		results_container = VBoxContainer.new()
-		results_container.add_theme_constant_override("separation", 8)
+		results_container.add_theme_constant_override("separation", 2)
 		vbox.add_child(results_container)
-		vbox.move_child(results_container, 1)
+		vbox.move_child(results_container, 2)
 	else:
 		for child in results_container.get_children():
 			child.queue_free()
@@ -669,7 +809,7 @@ func display_race_results(results_data: Array):
 	else:
 		var end_title := get_node_or_null("EndPanel/VBoxContainer/LabelFinished") as Label
 		if end_title:
-			end_title.text = "Race Finished!"
+			end_title.text = "RACE FINISHED"
 		_build_results_table(results_data, is_gp)
 
 	# Post-race track voting for multiplayer single stages (not after an arena match):
@@ -724,6 +864,13 @@ func display_race_results(results_data: Array):
 		vbox.move_child(menu_button, vbox.get_child_count() - 1)
 	elif menu_button != null:
 		menu_button.hide()
+	# A rule between the table (and the vote) and the buttons, as in the pause menu.
+	if _end_buttons_sep:
+		_end_buttons_sep.show()
+		var at := action_button.get_index()
+		if _end_buttons_sep.get_index() < at:
+			at -= 1
+		vbox.move_child(_end_buttons_sep, at)
 
 ## A one-course race outside multiplayer (time trial, splitscreen VS, spectator): the end screen
 ## offers the next course.
@@ -1099,12 +1246,8 @@ func _set_row(row_name: String, text: String, col: Color) -> void:
 
 
 func _timing_font() -> Font:
-	# Tabular figures, so the running clock doesn't jitter.
-	var fv := FontVariation.new()
-	fv.base_font = ThemeDB.fallback_font
-	var ts := TextServerManager.get_primary_interface()
-	fv.opentype_features = {ts.name_to_tag("tnum"): 1}
-	return fv
+	# Titillium Web Bold: its digits are all one width, so the running clock doesn't jitter.
+	return HS.bold()
 
 
 func _build_timing_panel() -> void:
@@ -1247,17 +1390,17 @@ func _build_results_table(results_data: Array, is_gp: bool) -> void:
 		if is_gp:
 			row.add_child(_results_label("+%d" % r.get("round_points", 0), 60, HORIZONTAL_ALIGNMENT_RIGHT, col))
 			row.add_child(_results_label("%d" % r.get("total_points", 0), 70, HORIZONTAL_ALIGNMENT_RIGHT, col))
-		results_container.add_child(row)
+		_add_result_row(row, results_container.get_child_count(), col == COL_T_GOLD)
 
 
 ## An arena match's table (ArenaGame.gd's results): place, name, team, the score and what earned it (goals or bases
 ## claimed), the winning team's line first in a team game.
 func _build_arena_results(results_data: Array) -> void:
 	var first: Dictionary = results_data[0]
-	# An arena game is a match, not a race (the panel's title is the scene's "Race Finished!").
+	# An arena game is a match, not a race (the panel's title is otherwise RACE FINISHED).
 	var title := get_node_or_null("EndPanel/VBoxContainer/LabelFinished") as Label
 	if title:
-		title.text = "Match Finished!"
+		title.text = "MATCH FINISHED"
 	if str(first.get("headline", "")) != "":
 		var head := _results_label(str(first["headline"]), 0, HORIZONTAL_ALIGNMENT_CENTER, COL_T_GOLD)
 		head.add_theme_font_size_override("font_size", 26)
@@ -1283,7 +1426,21 @@ func _build_arena_results(results_data: Array) -> void:
 		row.add_child(_results_label(str(r.get("team_name", "")), 90, HORIZONTAL_ALIGNMENT_LEFT, team_col))
 		row.add_child(_results_label("%d" % int(r.get("stat", 0)), 90, HORIZONTAL_ALIGNMENT_RIGHT, col, 0, true))
 		row.add_child(_results_label("%d" % int(r.get("score", 0)), 90, HORIZONTAL_ALIGNMENT_RIGHT, col, 0, true))
-		results_container.add_child(row)
+		_add_result_row(row, results_container.get_child_count(), col == COL_T_GOLD)
+
+
+## A table row on a faint stripe (every other row), the local player's row tinted gold.
+func _add_result_row(row: HBoxContainer, index: int, mine: bool) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1.0, 0.8, 0.25, 0.13) if mine else Color(1, 1, 1, 0.04 if index % 2 == 0 else 0.0)
+	sb.set_corner_radius_all(5)
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", sb)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(row)
+	results_container.add_child(p)
 
 
 func _best_of(laps: Array) -> int:

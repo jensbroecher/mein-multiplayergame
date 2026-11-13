@@ -1233,8 +1233,8 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   arena with the LevelSpawner at start-up (`_register_spawnable_levels`): Main.tscn lists only the first ten courses, so
   a LAN game on any later one never reached the clients.
 - The menus and the lobby call the football game Hex Bowl ("HEX BOWL • ALL VS ALL", "Arena: Hex Bowl (Teams)": the
-  user's wording; the code's kind stays "football"), and an arena's end panel says "Match Finished!"
-  (`RaceUI._build_arena_results`; the scene's title is the races' "Race Finished!").
+  user's wording; the code's kind stays "football"), and an arena's end panel says MATCH FINISHED
+  (`RaceUI._build_arena_results`; a race's says RACE FINISHED).
   `res://scratch/arena_end_title_check.tscn -- [football|ctf] [seconds=4]` (headless) checks both.
 - `ArenaGame.gd` (a child "ArenaGame" of an arena level) runs the match: Level.gd finds it (`arena`) and then fills the
   field with bots in every mode (`_fill_arena_bots`), skips the laps, gates, timing and commentator, spawns the item
@@ -1440,6 +1440,26 @@ DressingColliders.gd only flags, tyre stacks and ground cover are soft. Trees' c
 branches' spread at that height (`WoodlandBuilder.band_radius`: a spruce's or fir's skirt), Pinecrest's dwarf
 pines and junipers have a core collider and its logs and rockfall fences boxes, Bloombay's rocks (not
 pebbles) are all solid and its bent palms carry a hull of their low trunk.
+
+## The race HUD's fonts and the end panel (HudStyle.gd)
+
+- `HudStyle.gd` is the race screens' look, shared by RaceUI.gd (the HUD, the RACE ENDING countdown, the end panel) and
+  PauseMenu.gd, so the end panel and the pause menu match (the user found they looked different): the pause menu's
+  navy panel (`panel_style`), a theme (`theme()`: Titillium Web SemiBold 18 as the default font, buttons like the main
+  menu's chrome buttons with a teal border under the pointer and on focus, the separators) on each screen's root
+  control, titles in Russo One (`title`).
+- Fonts (SIL Open Font License, licences beside them): `fonts/RussoOne-Regular.ttf` for the big numbers and titles,
+  `fonts/TitilliumWeb-SemiBold.ttf`/`-Bold.ttf` for the rest. Russo One's digits differ in width, so the speed is three
+  fixed cells (`Speedo`, `_speed_digits`; the scene's LabelSpeed is hidden but still written); Titillium's are all one
+  width, so it is the lap clock's and the results' font (`_timing_font`).
+- HUD text over the 3D view has a dark outline and a soft shadow (`HudStyle.outline`). The place is the number with
+  its ordinal beside it (`PlaceRow`, `LabelOrdinal`) in gold, silver and bronze on the podium (`PLACE_COLORS`), "/ N"
+  under it; LAP n/N, STAGE n%. The standings list stands under it at y 140.
+- The end panel: the pause menu's panel over a dim (`EndDim`), RACE FINISHED (MATCH FINISHED, TIME TRIAL · STAGE), a
+  rule, the table on faint stripes with the local player's row tinted gold (`_add_result_row`), a rule, the buttons.
+  The pause menu's panel is as tall as its content (`_fit_panel`).
+- `res://scratch/race_screens_shot.tscn -- <dir> [level=] [cam=x,y,z:tx,ty,tz] [size=WxH]` (windowed) photographs the HUD,
+  the end panel (a race's and an arena match's) and the pause menu over a level.
 
 ## Button sounds and the screen swipe
 
@@ -3943,7 +3963,7 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
   (berms included in their heights) on the wall clock; a cart bursts one and keeps `HIT_KEEP` of its speed.
 - Level.gd: `is_point_to_point` (one lap; checkpoints sorted along the open path; the start gantry is `StartLine`, which
   holds the grid's SpawnPoints and the start lights and ticker); the HUD's stage progress is measured to the finish line
-  (`_finish_offset`); after the finish carts brake to a stop in the run-out. RaceUI shows `STAGE: n%`, the minimap an open
+  (`_finish_offset`); after the finish carts brake to a stop in the run-out. RaceUI shows `STAGE n%`, the minimap an open
   line with start and finish.
 - Tests: `scratch/ai_race_test.tscn -- res://levels/MinaLevel.tscn seconds=200 speed=2` (6/6 finish in about 115-135s, no
   respawns but items); `scratch/nyota_jump_test.tscn -- level=res://levels/MinaLevel.tscn speeds=30,40,50,60 ground=1` (the

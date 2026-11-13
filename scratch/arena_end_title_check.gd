@@ -1,6 +1,6 @@
 extends Node
 ## Plays a few seconds of an arena match as a single player, headless, and prints the end panel's title once the
-## match is over (it must say "Match Finished!", not the races' "Race Finished!"), and the menus' names for the
+## match is over (it must say "MATCH FINISHED", not the races' "RACE FINISHED"), and the menus' names for the
 ## football arena (MainMenu's tiles, the lobby's modes: "Hex Bowl").
 ##   Godot --headless --path . res://scratch/arena_end_title_check.tscn -- [football|ctf] [seconds=4]
 
@@ -28,7 +28,7 @@ func _ready() -> void:
 		var title := ui.get_node_or_null("EndPanel/VBoxContainer/LabelFinished") as Label
 		var text := title.text if title else "(no title)"
 		print("end title: \"%s\" (panel shown: %s)" % [text, str(ui.get_node("EndPanel").visible)])
-		if text != "Match Finished!":
+		if text != "MATCH FINISHED":
 			bad += 1
 	var lobby_src := FileAccess.get_file_as_string("res://Lobby.gd")
 	var menu_src := FileAccess.get_file_as_string("res://MainMenu.gd")
