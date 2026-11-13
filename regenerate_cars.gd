@@ -42,6 +42,7 @@ const CARS := [
 	{"name": "Crimson", "prefix": "crimson", "builder": preload("res://CrimsonBuilder.gd")},
 	{"name": "Typhoon", "prefix": "typhoon", "builder": preload("res://TyphoonBuilder.gd")},
 	{"name": "Jukebox", "prefix": "jukebox", "builder": preload("res://JukeboxBuilder.gd")},
+	{"name": "Hexapod", "prefix": "hexapod", "builder": preload("res://HexapodBuilder.gd")},
 ]
 
 
@@ -135,6 +136,19 @@ static func assemble(car_name: String, parts: Dictionary) -> Node3D:
 		w.position = design.WHEEL_POSITIONS[corner]
 		w.set_meta("car_shader", true)
 		model.add_child(w)
+	# More axles (the Hexapod's middle pair): wheels of their own that turn with one of the four the game drives
+	# (CarAxleFollower.gd). EXTRA_WHEELS: {name: [position, the corner it follows]}.
+	if "EXTRA_WHEELS" in design:
+		for corner in design.EXTRA_WHEELS:
+			var entry: Array = design.EXTRA_WHEELS[corner]
+			var w := MeshInstance3D.new()
+			w.name = "Wheel_" + String(corner)
+			w.mesh = parts["wheel_l" if String(corner).ends_with("L") else "wheel_r"]
+			w.position = entry[0]
+			w.set_script(load("res://CarAxleFollower.gd"))
+			w.set("follow", "Wheel_" + String(entry[1]))
+			w.set_meta("car_shader", true)
+			model.add_child(w)
 	if parts.has("glass"):
 		# The canopy: car_glass.gdshader, see-through, casting no shadow on the cockpit under it.
 		var glass := MeshInstance3D.new()

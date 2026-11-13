@@ -3120,6 +3120,15 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
   hung off the back and were taken off: only the sphere collides, but 30cm of bar 2cm off the ground would sink into
   every ramp and landing. Its shocks are big-bore bodies in the accent colour (`_big_shock`), stood nearly
   upright beside the tyres so they show in the gap under the flares.
+- The Hexapod (`HexapodBuilder.gd`, in 4x4 & Monsters; the user's pick from four ideas): a six-wheeled exploration rover, an
+  original design with a made-up name. The Titan's keyed section, flares, suspension and wheel (five solid spokes) on three
+  axles (`AXLE_F/M/R` ±0.86 and 0, 2.6m long): a cab-forward glazed cabin with a roof rack (light bar, a rolled tarp, a
+  case), a flat cargo deck (`DECK_Y`, a dark mat in the detail map) behind a rail with a dish aerial on a mast, a tilted
+  solar panel, two strapped cases and jerrycans. The game drives four wheels: a builder's `EXTRA_WHEELS` ({name:
+  [position, the corner it follows]}) become wheel nodes with `CarAxleFollower.gd` (regenerate_cars.gd), which copy that
+  wheel's spin and hide with it. The heaviest car (weight 1.32) and the best off-road (10), slow (36) and slow to turn.
+  Factory paint white with black and orange, number 6; its engine `engine_hexapod` (tools/elevenlabs: a heavy electric
+  drive, its seam cross-faded, +8 dB).
 - The Sandstorm (`SandstormBuilder.gd`, a desert rally-raid buggy, an original design with a made-up name) is built on
   the Titan's keyed section and flares, lower and longer: a closed cab with a sloping rear window, an engine cover
   falling to the tail with two sand ladders (`_deck_load`, accent colour) strapped on it, a painted roof scoop

@@ -485,6 +485,25 @@ const CAR_PRESETS = [
 		"offroad": 3.0,
 		"weight": 1.22,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Hexapod",
+		# A heavy electric drive (tools/elevenlabs "engine_hexapod", its seam cross-faded by scratch/seamless_loop.py),
+		# levelled by its RMS (-17.7 dBFS).
+		"engine_sound": "res://sounds/enginesounds/engine_hexapod_loop.wav",
+		"engine_gain_db": 8.0,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes; its middle wheels follow the rear pair
+		# (CarAxleFollower.gd).
+		"model_path": "res://generated/cars/Hexapod.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 36.0,
+		"acceleration": 66.0,
+		"steer_speed": 2.0,
+		"grip": 5.2,
+		"braking": 46.0,
+		"offroad": 10.0,
+		"weight": 1.32,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

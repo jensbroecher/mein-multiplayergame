@@ -1,0 +1,52 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/cars/hexapod_body.res" id="1_7qmku"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/hexapod_wheel_l.res" id="2_knndp"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/hexapod_wheel_r.res" id="3_m11y5"]
+[ext_resource type="Script" path="res://CarAxleFollower.gd" id="4_j5woy"]
+
+[node name="Hexapod" type="Node3D" unique_id=1191206927]
+metadata/procedural_car = true
+
+[node name="Model" type="Node3D" parent="." unique_id=1504064891]
+transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
+
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=1437523654]
+mesh = ExtResource("1_7qmku")
+metadata/car_shader = true
+
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=204091475]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.66, 0.345, -0.86)
+mesh = ExtResource("2_knndp")
+metadata/car_shader = true
+
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=1525969264]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.66, 0.345, -0.86)
+mesh = ExtResource("3_m11y5")
+metadata/car_shader = true
+
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=1191742221]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.66, 0.345, 0.86)
+mesh = ExtResource("2_knndp")
+metadata/car_shader = true
+
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=1339963404]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.66, 0.345, 0.86)
+mesh = ExtResource("3_m11y5")
+metadata/car_shader = true
+
+[node name="Wheel_ML" type="MeshInstance3D" parent="Model" unique_id=1125291437]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.66, 0.345, 0)
+mesh = ExtResource("2_knndp")
+script = ExtResource("4_j5woy")
+metadata/car_shader = true
+
+[node name="Wheel_MR" type="MeshInstance3D" parent="Model" unique_id=2139219558]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.66, 0.345, 0)
+mesh = ExtResource("3_m11y5")
+script = ExtResource("4_j5woy")
+follow = "Wheel_RR"
+metadata/car_shader = true
+
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=1371274635]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.866, 1.16)

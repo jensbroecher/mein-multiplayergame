@@ -375,6 +375,19 @@ const CAR_PRESETS = [
 		"offroad": 3.0,
 		"desc": "A 1950s tailfin cruiser: hooded headlamps, a wraparound screen, chrome from bumper to bumper and whitewalls under skirts. The longest car on the grid and the heaviest that isn't a truck: slow to get going and slow to turn, but planted and fast once it rolls, and it shoves lighter cars aside.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Hexapod",
+		"model_path": "res://generated/cars/Hexapod.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 36.0,
+		"acceleration": 66.0,
+		"steer_speed": 2.0,
+		"grip": 5.2,
+		"braking": 46.0,
+		"offroad": 10.0,
+		"desc": "A six-wheeled exploration rover: a glazed cabin up front, a cargo deck with a dish, a solar panel and strapped cases behind, six tall tyres on long-travel suspension. The heaviest car on the grid and the best off the road, where nothing slows it; on tarmac it is slow and takes its time to turn.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -391,7 +404,7 @@ const CAR_ACCENTS := {
 	"Bootlegger": Color(1.0, 0.48, 0.14), "Meteor": Color(0.86, 0.88, 0.92), "Kugelblitz": Color(0.45, 0.88, 0.76),
 	"Sandpiper": Color(0.22, 0.84, 0.88), "Samurai": Color(0.98, 0.36, 0.20),
 	"Ninja": Color(0.95, 0.22, 0.34), "Crimson": Color(1.0, 0.18, 0.22), "Typhoon": Color(1.0, 0.72, 0.10),
-	"Jukebox": Color(1.0, 0.56, 0.72),
+	"Jukebox": Color(1.0, 0.56, 0.72), "Hexapod": Color(0.98, 0.50, 0.12),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [

@@ -125,6 +125,9 @@ const FACTORY := {
 	"Jukebox": {"pattern": 2, "finish": 0, "primary": Color(0.95, 0.91, 0.80),
 		"secondary": Color(0.97, 0.56, 0.64), "accent": Color(0.16, 0.66, 0.66),
 		"rim": Color(0.92, 0.92, 0.90), "number": 59},
+	"Hexapod": {"pattern": 0, "finish": 0, "primary": Color(0.91, 0.90, 0.86),
+		"secondary": Color(0.10, 0.10, 0.11), "accent": Color(0.96, 0.44, 0.08),
+		"rim": Color(0.13, 0.13, 0.14), "number": 6},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),

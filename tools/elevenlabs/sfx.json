@@ -814,5 +814,13 @@
   "duration": 1.0,
   "loop": false,
   "influence": 0.6
+ },
+ {
+  "name": "engine_hexapod",
+  "path": "sounds/enginesounds/engine_hexapod_loop.wav",
+  "text": "A heavy six-wheeled electric exploration rover driving at a steady speed: a deep constant electric motor hum with a gear whine on top and a low drivetrain rumble, steady pitch, continuous, no music, no voices",
+  "duration": 6.0,
+  "loop": true,
+  "influence": 0.6
  }
 ]
