@@ -296,6 +296,16 @@ func _watch_lost(delta: float, nearest: float) -> void:
 		_reset()
 
 
+## A look the arena gives the ball for a moment (ArenaGame.gd: charging up in the net after a goal, popping out of
+## nothing at a kick-off): its drawn size (the collider stays as it is) and a glow over its own colours.
+func set_fx(size: float, glow: float, tint := Color(1, 1, 1)) -> void:
+	if _mesh == null:
+		return
+	_mesh.scale = Vector3.ONE * maxf(size, 0.001)
+	_mesh.set_instance_shader_parameter(&"fx_glow", glow)
+	_mesh.set_instance_shader_parameter(&"fx_tint", Vector3(tint.r, tint.g, tint.b))
+
+
 ## Back where it started, still (ArenaGame.gd's kick-off).
 func reset_home(home: Transform3D = Transform3D()) -> void:
 	if home != Transform3D():

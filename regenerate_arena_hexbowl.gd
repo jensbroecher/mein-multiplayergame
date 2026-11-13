@@ -11,6 +11,12 @@ extends "res://ArenaStage.gd"
 ## `GOAL_H` high, `GOAL_D` deep (a GoalNet inside), its posts, bar and goal line in the "arena_paint" group (coloured by
 ## ArenaGame). Spawn k in front of goal k (ArenaGame gives slot k goal k, and in teams goal k to team k % 2, so a team
 ## starts at its own goals). The ceiling (invisible, `LID`) and the glass's colliders keep the balls and the launched cars in.
+##
+## Nothing in the bowl has a flat top a ball can come to rest on out of the cars' reach: behind each slingshot bar the
+## corner is a padded slope (`_corner_slope`) from the bar's top up the walls, which sends a ball (or a launched car)
+## back down onto the bar and off it. It had been a block level with the wall pads, a 2.6m ledge in every corner where
+## the ball lay for good. The bowl's names are on boards over the stands' back walls: on the wall under the first tier
+## they stood behind the goals' pockets and the wall pads.
 
 const R := 48.0
 const RC := R / 0.8660254
@@ -25,6 +31,12 @@ const TIERS := 9
 const TIER_DEPTH := 1.5
 const TIER_RISE := 0.95
 const SPECTATOR_SCALE := 0.86
+## The corner slopes: from the slingshot bar's back face (`SLOPE_FROM` in from the corner, at its collider's top
+## `SLOPE_LOW`) up to `SLOPE_TOP` at the corner.
+const BAR_IN := 5.0
+const SLOPE_FROM := 4.3
+const SLOPE_LOW := 2.0
+const SLOPE_TOP := 8.6
 
 
 func _configure() -> void:
@@ -216,10 +228,9 @@ func _build_play(arena: Node3D) -> void:
 	for k in 6:
 		var a := k * PI / 3.0 + PI / 6.0
 		var dir := Vector3(cos(a), 0, sin(a))
-		var at := dir * (RC - 5.0)
+		var at := dir * (RC - BAR_IN)
 		bumper(play, "Slingshot%d" % k, facing(at, Vector3.ZERO), 1.4, 17.5, Color(1.0, 0.75, 0.15), 16.0)
-		# Behind the bar: the corner filled in, so nothing gets stuck there.
-		box(play, "CornerFill%d" % k, Vector3(17.5, WALL_PAD, 4.0), facing(dir * (RC - 2.6) + Vector3(0, WALL_PAD * 0.5, 0), Vector3.ZERO), mat("pad", Color()), "rock")
+		_corner_slope(play, k, dir)
 		fan(play, "Fan%d" % k, Transform3D(Basis(), dir * 30.0), 28.0, 0.0, 3.2)
 		item_spot(dir * 20.0)
 	var balls := Node3D.new()
@@ -236,6 +247,73 @@ func _build_play(arena: Node3D) -> void:
 	bs.name = "BallSpawn"
 	bs.position = Vector3(0, 0.5, 0)
 	game.add_child(bs)
+
+
+var _slope_mesh: ArrayMesh
+var _slope_shape: ConvexPolygonShape3D
+
+
+func _tri_facing(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, out: Vector3) -> void:
+	# Godot's front faces: (c - a) x (b - a) is the way they look.
+	if (c - a).cross(b - a).dot(out) < 0.0:
+		var t := b
+		b = c
+		c = t
+	st.set_normal((c - a).cross(b - a).normalized())
+	st.add_vertex(a)
+	st.add_vertex(b)
+	st.add_vertex(c)
+
+
+## The corner behind slingshot bar `k`: a padded slope from the bar's top up to the walls' meeting, solid, two
+## glowing bands across it. In the corner's frame (-z toward the middle, the corner at the origin) the pocket between
+## the bar and the two walls is a triangle, its half width tan(60) times the way in.
+func _corner_slope(parent: Node3D, k: int, dir: Vector3) -> void:
+	var w := SLOPE_FROM * tan(PI / 3.0) * 1.06
+	var a := Vector3(-w, SLOPE_LOW, -SLOPE_FROM)
+	var b := Vector3(w, SLOPE_LOW, -SLOPE_FROM)
+	var c := Vector3(0, SLOPE_TOP, 0.4)
+	if _slope_mesh == null:
+		var up := (c - a).cross(b - a)
+		if up.y < 0.0:
+			up = -up
+		up = up.normalized()
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		_tri_facing(st, a, b, c, up)
+		var a0 := Vector3(a.x, 0, a.z)
+		var b0 := Vector3(b.x, 0, b.z)
+		_tri_facing(st, a0, b0, b, Vector3(0, 0, -1))
+		_tri_facing(st, a0, b, a, Vector3(0, 0, -1))
+		var mesh := st.commit()
+		mesh.surface_set_material(0, mat("pad", Color()))
+		# Two bands of light across the slope, a little proud of it.
+		var bands := SurfaceTool.new()
+		bands.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for band in [Vector2(0.1, 0.16), Vector2(0.3, 0.35)]:
+			var l0 := a.lerp(c, band.x) + up * 0.03
+			var r0 := b.lerp(c, band.x) + up * 0.03
+			var l1 := a.lerp(c, band.y) + up * 0.03
+			var r1 := b.lerp(c, band.y) + up * 0.03
+			_tri_facing(bands, l0, r0, r1, up)
+			_tri_facing(bands, l0, r1, l1, up)
+		bands.commit(mesh)
+		mesh.surface_set_material(1, mat("stripe", Color()))
+		_slope_mesh = _save_res(mesh, "corner_slope_mesh")
+		var shape := ConvexPolygonShape3D.new()
+		shape.points = PackedVector3Array([a, b, c, a0, b0, Vector3(c.x, 0, c.z)])
+		_slope_shape = _save_res(shape, "corner_slope_shape")
+	var body := StaticBody3D.new()
+	body.name = "CornerSlope%d" % k
+	body.transform = facing(dir * RC, Vector3.ZERO)
+	body.set_meta(&"surface", "rock")
+	var cs := CollisionShape3D.new()
+	cs.shape = _slope_shape
+	body.add_child(cs)
+	var mi := MeshInstance3D.new()
+	mi.mesh = _slope_mesh
+	body.add_child(mi)
+	parent.add_child(body)
 
 
 func _build_stands(level: Node3D, arena: Node3D) -> void:
@@ -269,14 +347,21 @@ func _build_stands(level: Node3D, arena: Node3D) -> void:
 		var seg_len_b := 2.0 * d_back * tan(PI / 6.0)
 		deco_box(stands, Vector3(seg_len_b, top_back, 1.0), Transform3D(b, b.z * d_back + Vector3(0, top_back * 0.5, 0)), conc)
 		deco_box(stands, Vector3(seg_len_b - 2.0, 1.4, 0.1), Transform3D(b, b.z * (d_back - 0.56) + Vector3(0, top_back - 1.6, 0)), mat("ribbon%d" % (k % 3), [Color(0.2, 0.85, 1.0), Color(1.0, 0.35, 0.75), Color(0.6, 1.0, 0.3)][k % 3], 0.4, 0.0, 2.5))
-		# Under the first tier: the wall between the concourse and the stand, with the arena's name.
+		# The arena's name on a board standing on the back wall, over the crowd (see the header).
+		var board_w := seg_len_b * 0.6
+		var board_h := 5.4
+		var sign_y := top_back + board_h * 0.5
+		deco_box(stands, Vector3(board_w, board_h, 0.5), Transform3D(b, b.z * (d_back - 0.2) + Vector3(0, sign_y, 0)), mat("sign_board", Color(0.025, 0.03, 0.06), 0.5))
+		deco_box(stands, Vector3(board_w + 0.6, 0.3, 0.7), Transform3D(b, b.z * (d_back - 0.2) + Vector3(0, top_back + board_h + 0.15, 0)), mat("tower", Color(0.3, 0.32, 0.36), 0.4, 0.7))
 		var lab := Label3D.new()
 		lab.text = "HEX BOWL" if k % 2 == 0 else "RC VIBE GP ARENA"
 		lab.font_size = 160
-		lab.pixel_size = 0.02
-		lab.modulate = Color(0.85, 0.95, 1.0)
+		lab.pixel_size = 0.027
+		lab.modulate = [Color(0.75, 1.9, 2.3), Color(2.3, 0.9, 1.7), Color(1.5, 2.2, 0.8)][k % 3]
 		lab.outline_size = 0
-		lab.transform = Transform3D(b.rotated(Vector3.UP, PI), b.z * (R + STAND_FROM - 0.05) + Vector3(0, 3.6, 0))
+		lab.double_sided = false
+		lab.alpha_cut = Label3D.ALPHA_CUT_DISCARD
+		lab.transform = Transform3D(b.rotated(Vector3.UP, PI), b.z * (d_back - 0.52) + Vector3(0, sign_y - 0.1, 0))
 		stands.add_child(lab)
 	var crowd: Node3D = load("res://CrowdPlacer.gd").build(level, people, SPECTATOR_SCALE, [0.15, 0.15, 0.4, 0.2, 0.1], 77,
 		func(res: Resource, n: String) -> Resource: return _save_res(res, "crowd_" + n))

@@ -70,8 +70,13 @@ func _ready() -> void:
 	add_child(cam)
 	cam.make_current()
 	var path: Path3D = level.get_node_or_null("TrackPath")
-	var curve := path.curve
+	# A level with no lap (the arenas) is sampled from cam= spots only.
+	var curve: Curve3D = path.curve if path else Curve3D.new()
 	var length := curve.get_baked_length()
+	if path == null and cams.is_empty():
+		push_error("no TrackPath: give cam=x,y,z:tx,ty,tz spots")
+		get_tree().quit()
+		return
 	for i in 20:
 		await get_tree().process_frame
 	print("AB ", level_path, " tex=", vp.get_texture().get_size(), " variants=", variants)

@@ -1147,7 +1147,8 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
 - Made so far: the airliners' approach and climb-out roars (Airliners.gd); the suspended railway's run, pass-by bursts,
   brakes and station chime (SuspendedTrains.gd; its first soft glide loop is unused now); Qaysariyyat al-Manara's market
   murmur and the start promenade's six cheers (Marina Nights, CrowdCheers.gd); Rheinufer's ship horns and diesel, Autobahn
-  hum, Kirmes, sheep, river and windmill (`sounds/rheinufer/`); the Classics' engines (`engine_bootlegger`,
+  hum, Kirmes, sheep, river and windmill (`sounds/rheinufer/`); the arena football's goal horn, burst, kick-off and
+  ball reset (`sounds/arena/`); the Classics' engines (`engine_bootlegger`,
   `engine_meteor`, `engine_bubble`) and the Sandpiper's (`engine_sandpiper`); the garage's lifts and line-up (`garage_*`, `sounds/garage/`). One-shots are
   levelled by their loudest second, loops by their RMS. Very short one-shots (a single clack under a second) come back
   as smeared noise, take after take: synthesise those (`scratch/garage_lock_click.py`).
@@ -1249,15 +1250,62 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   `_soften_edge_pops` took a launch off the heightfield's creases for a pop off a step and capped it at a hop.
   `res://scratch/arena_fan_probe.tscn -- <level> [speed=16] [only=<name>]` (headless) coasts a bot over each fan and
   prints how high it went and where it landed.
-- The Hex Bowl (`regenerate_arena_hexbowl.gd` on `ArenaStage.gd`, about 1s): a hexagonal pitch under floodlights
+- The Hex Bowl (`regenerate_arena_hexbowl.gd` on `ArenaStage.gd`, about 2s): a hexagonal pitch under floodlights
   (`arena_pitch.gdshader`), a goal (GoalNet) in each side's middle, padded walls with glass and an invisible screen up to
   the lid, slingshot bars across the corners, three pop bumpers, six launch fans, full stands (CrowdPlacer, about 2,600),
   light towers. The ball is KickBall's ARENA style (1.9m, its seams glowing; `remote_driven` on a client).
-- Flag Hill (`regenerate_arena_ctf.gd`, about 2s): a round valley, the flag on a mesa with four ramps, five bases (A a
+  - Nothing in the bowl may have a flat top a ball can rest on out of the cars' reach. Behind each slingshot bar the
+    corner is a padded slope (`_corner_slope`, `SLOPE_*`: from the bar's back at its collider's top up to 8.6m at the
+    corner, 56 degrees, a convex collider), which sends the ball down onto the bar, and the bar kicks it off. It had been
+    a block level with the wall pads: a 2.6m ledge in every corner where the ball lay for good (the user found it).
+    ArenaGame also takes back to the middle a ball at rest more than `STRANDED_UP` over the pitch for `STRANDED_TIME`,
+    or one that hasn't moved `STUCK_MOVE` in `STUCK_TIME` (`_ball_out_of_reach`, `_return_ball`: a puff, BALL BACK TO
+    THE MIDDLE, a new kick-off). `res://scratch/arena_ball_reach_test.tscn -- [watch=10] [only=corner]` (headless,
+    about six minutes) drops the ball from 12m over every corner, bar, wall foot, goal and bumper with the bots held
+    and prints where it lay (PASS: it always comes back down to the pitch, and a ball held in the air is returned).
+  - A goal doesn't just take the ball away (`GOAL_LINGER`, `_ball_fx_rpc`, `ArenaFx.gd`, `arena_fx.gdshader`): it
+    flies on into the net for 0.55s, glowing up in the scorer's colour (`KickBall.set_fx`: the drawn size and a glow
+    through kick_ball.gdshader's instance uniforms `fx_glow`, `fx_tint`) while the goal's frame lights up, confetti
+    comes out of its mouth and a ring runs out from its line, then bursts (two shells of light, sparks, one flash
+    light); a horn and the burst's boom. At every kick-off it comes down a column of light, a ring running out on the
+    pitch under it, popping out of nothing with a little overshoot. The host sends each moment reliably ("score",
+    "burst", "spawn", "reset"); every peer draws it. ArenaFx makes its shapes, particles and light once in `_ready`
+    (their pipelines compile under the loading screen) and reuses them; physics interpolation is off on it (a reused
+    shape would sweep in from where it last was). Sounds `sounds/arena/` (tools/elevenlabs `arena_*`, levelled by
+    their loudest second). `res://scratch/arena_fx_shots.tscn -- <dir> [teams=1] [goal=0]` (windowed) shoots the ball
+    into a goal and saves frames through the goal, the burst and the ball's return, then two views of the bowl.
+  - Each goal has its owner's name over its bar (`_goal_labels`, set in `_paint_goals`: the player's, or RED/BLUE).
+    The bowl's names (HEX BOWL, RC VIBE GP ARENA) are on boards standing on the stands' back walls, over the crowd:
+    on the wall under the first tier they stood behind the goals' pockets and the wall pads (the user saw "ENA").
+- Flag Hill (`regenerate_arena_ctf.gd`, about 7s): a round valley, the flag on a mesa with four ramps, five bases (A a
   hilltop, B a bowl, C an island ringed by a cliff and a moat with one lane up and an aimed fan onto it, D a deck on
   pillars with a ramp and an aimed fan, E a ring of bumpers), kickers, fans, a heightfield ground (`arena_ground.gdshader`,
   dirt tracks along the bots' graph). `res://scratch/arena_ctf_map.gd` (`-s`, headless, `-- <out.png>`) draws its plan
   hillshaded with the graph over it.
+  - The country (the user found the first version bare: a brown 80m bowl wall and cones on sticks for trees): past
+    `PLAY_R` the ground rises as a rocky bank (the invisible fence stands on it, `FENCE_OUT`) into wooded hills and far
+    ranges (`_side`: `roll`, `ridge` noise); a ring of ground carries it on past the heightfield's square to `BACK_R`
+    (`_build_backdrop`, "BackdropGround": rings of squares growing outward in the ground's own material, the first two
+    just under the heightfield's edge). `arena_ground.gdshader` paints it from the vertex colours (r how open, g rock,
+    b tracks, a sand): a meadow in lush and dry patches, the forest floor under the woods and the canopy itself past
+    `canopy_from`, the tracks in tan earth with ragged edges (dirt.png only for its grain: its own red-brown tiled),
+    the boulders' granite (granite.gdshaderinc) on every steep face (dark_canyon_rock.png, pebble rubble, had drawn
+    the cliffs dark brown).
+  - Woods (`_build_woods`): WoodlandBuilder's spruce, fir, larch, birch, oak and lime (no pines: their bare orange
+    trunks stood out like poles), Tree_/TreeShadow_/TreeFar_ cells under a JungleDetail, the hills' depth
+    TreeDeep_/TreeDeepFar_, stand-ins alone from `WOODS_R` to `FAR_WOODS_R`; hazel (Plants_) at the woods' edges.
+    About 1,400 trees, 2,900 far stand-ins, 480 shrubs. Granite boulders (`_build_boulders`, Lakeside's mesh) along
+    the bank, cropping out of the hills, by the groves. Meadow grass (`_build_meadow`, MeadowGrass.gd as on Lakeside
+    Meadows, a 0.5m map over the heightfield's square): none on the tracks, sand, rock or under anything (`_stamps`).
+  - Whatever grows or lies inside the fence keeps off what is driven (`_plan_clear`, `_clear_d`: the bots' graph by
+    15m, the bases, the tower's ramp, the fans' and kickers' flights; nothing within `OPEN_R` of the middle), and is
+    solid (DressingColliders: trunks from the near cells, the boulders' hulls). Everything past the fence carries
+    `skip_dressing_colliders`.
+  - Cost (M1, `ab_bench` with four `cam=` spots, which now works on a level with no lap): 13.1ms at High; the woods
+    3.3ms, the meadow 3.7, the boulders 0.7 (before the ones past the fence went to a coarser mesh), the backdrop
+    0.25; Low 8.4ms, Ultra 16.2. Bot matches (`arena_match_test ctf`, with and without teams): every base is claimed,
+    the respawns are item blasts on the mesa and the odd bot at the tower ramp's foot (nothing of the scenery stands
+    within 13m of it: `colliders_near`).
 - `res://scratch/arena_match_test.tscn -- <football|ctf> [teams=1] [seconds=120] [speed=3] [every=10]` (headless) plays a
   match of six bots and prints the clock, scores, balls or flag and bases, respawns and the result;
   `res://scratch/arena_hud_shot.tscn -- <football|ctf> <dir> [teams=1] [at=8,30] [drive=1]` (windowed) plays one as a

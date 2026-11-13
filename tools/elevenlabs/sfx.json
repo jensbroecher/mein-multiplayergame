@@ -822,5 +822,37 @@
   "duration": 6.0,
   "loop": true,
   "influence": 0.6
+ },
+ {
+  "name": "arena_goal_burst",
+  "path": "sounds/arena/goal_burst.wav",
+  "text": "A big arcade goal explosion: a deep punchy bass boom with a bright electric energy burst and a shower of glittering sparkles fading out, futuristic sports game, dry, no music, no voices",
+  "duration": 2.5,
+  "loop": false,
+  "influence": 0.55
+ },
+ {
+  "name": "arena_goal_horn",
+  "path": "sounds/arena/goal_horn.wav",
+  "text": "A stadium goal horn: one loud deep air horn blast held for a second and a half, then stopping, indoor arena, no crowd, no music",
+  "duration": 2.2,
+  "loop": false,
+  "influence": 0.6
+ },
+ {
+  "name": "arena_ball_spawn",
+  "path": "sounds/arena/ball_spawn.wav",
+  "text": "A ball materialising from an energy beam: a quick rising synthetic whoosh that swells and ends in a soft bright shimmering pop, futuristic arcade game, short, dry, no music",
+  "duration": 1.5,
+  "loop": false,
+  "influence": 0.55
+ },
+ {
+  "name": "arena_ball_reset",
+  "path": "sounds/arena/ball_reset.wav",
+  "text": "A short soft electronic teleport away sound: a quick downward synth zap with a light fizz, arcade game, very short, dry, no music",
+  "duration": 1.0,
+  "loop": false,
+  "influence": 0.55
  }
 ]

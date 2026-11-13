@@ -8,7 +8,10 @@ extends Node3D
 ## owns one: a ball in someone else's goal scores for whoever touched it last, and its owner loses a point. In teams the
 ## goals alternate red and blue: a ball in the other side's goal scores for your side. The ball (KickBall.gd's ARENA
 ## style, "Balls/Ball_0") comes back to the middle after each goal; from MULTIBALL_FIRST a second ("Ball_1") joins
-## every MULTIBALL_EVERY seconds until it goes in.
+## every MULTIBALL_EVERY seconds until it goes in. A goal doesn't just take the ball away: it flies on into the net
+## for GOAL_LINGER, charging up in the scorer's colour while the goal's frame lights up and confetti comes out of its
+## mouth, then bursts (ArenaFx.gd); it comes back down a column of light. A ball nobody can get at (at rest up on
+## something for STRANDED_TIME, or not moved STUCK_MOVE in STUCK_TIME) is taken back to the middle.
 ##
 ## Capture the flag (`kind` "ctf"): one flag at "FlagSpawn". Drive into it to take it; ram its carrier to steal it (a
 ## carrier that blows up or is respawned drops it, and a dropped flag goes home after FLAG_RETURN). Bring it to a
@@ -40,6 +43,17 @@ const NEUTRAL := Color(0.74, 0.76, 0.8)
 @export var win_score := 0
 
 const GOAL_PAUSE := 2.6
+const GOAL_LINGER := 0.55
+const GOAL_FLASH := 1.6
+const APPEAR_TIME := 0.5
+## A ball at rest (under STRANDED_SPEED) with its middle more than STRANDED_UP over where it lies on the pitch is up
+## on something no car drives on; after STRANDED_TIME it goes back to the middle. So does one that hasn't moved
+## STUCK_MOVE in STUCK_TIME (wedged: with six cars after it a free ball never lies that long).
+const STRANDED_UP := 1.5
+const STRANDED_SPEED := 1.6
+const STRANDED_TIME := 2.0
+const STUCK_MOVE := 2.0
+const STUCK_TIME := 12.0
 const MULTIBALL_FIRST := 80.0
 const MULTIBALL_EVERY := 75.0
 const TOUCH_REACH := 3.3
@@ -80,6 +94,15 @@ var _ball_pause: Array = []
 var _last_touch: Array = []
 var _ball_net: Array = []
 var _ball_spawn := Vector3.ZERO
+var _ball_linger: Array = []
+var _ball_side: Array = []
+var _ball_stranded: Array = []
+var _ball_anchor: Array = []
+## Each ball's passing look on this peer: [what ("", "charge", "appear"), its age, its colour].
+var _ball_anim: Array = []
+var _goal_flash := PackedFloat32Array()
+var _goal_labels: Array = []
+var _fx: Node3D
 var _multiball_t := 0.0
 
 var _bases: Array = []
@@ -135,6 +158,11 @@ func _ready() -> void:
 				_ball_pause.append(0.0)
 				_last_touch.append(0)
 				_ball_net.append([b.global_position, Vector3.ZERO])
+				_ball_linger.append(0.0)
+				_ball_side.append(-1)
+				_ball_stranded.append(0.0)
+				_ball_anchor.append([b.global_position, 0.0])
+				_ball_anim.append(["", 0.0, Color(1, 1, 1)])
 	var bs := get_node_or_null("BallSpawn")
 	_ball_spawn = bs.global_position if bs else global_position
 	var bases_node := get_node_or_null("Bases")
@@ -158,6 +186,12 @@ func _ready() -> void:
 		_build_bases()
 		_build_nav()
 	_build_goal_vis()
+	_goal_flash.resize(_goals.size())
+	if kind == "football":
+		_fx = Node3D.new()
+		_fx.name = "ArenaFx"
+		_fx.set_script(load("res://ArenaFx.gd"))
+		add_child(_fx)
 	call_deferred("_setup_hud")
 	if client:
 		_request_config.rpc_id(1)
@@ -358,6 +392,9 @@ func _set_ball_active(i: int, on: bool, at_spawn := true) -> void:
 	var b: RigidBody3D = _balls[i]
 	b.visible = on
 	b.process_mode = Node.PROCESS_MODE_INHERIT if on else Node.PROCESS_MODE_DISABLED
+	if not on and b.has_method("set_fx"):
+		_ball_anim[i] = ["", 0.0, Color(1, 1, 1)]
+		b.set_fx(1.0, 0.0)
 	if on and at_spawn and (multiplayer.multiplayer_peer == null or multiplayer.is_server()):
 		var off := Vector3(randf_range(-3.0, 3.0), 7.0 + 2.0 * i, randf_range(-3.0, 3.0))
 		if b.has_method("reset_home"):
@@ -369,8 +406,37 @@ func _set_ball_active(i: int, on: bool, at_spawn := true) -> void:
 
 func _kickoff(i: int) -> void:
 	_ball_pause[i] = 0.0
+	_ball_linger[i] = 0.0
+	_ball_stranded[i] = 0.0
 	_last_touch[i] = 0
 	_set_ball_active(i, true)
+	var at: Vector3 = (_balls[i] as Node3D).global_position
+	_ball_anchor[i] = [at, 0.0]
+	_ball_fx_all("spawn", i, at, -1, -1)
+
+
+## A ball nobody can get at goes back to the middle: a puff where it lay, a new kick-off.
+func _return_ball(i: int) -> void:
+	_ball_fx_all("reset", i, (_balls[i] as Node3D).global_position, -1, -1)
+	_event_rpc_all("ballreset", "", -1)
+	_kickoff(i)
+
+
+## Whether ball `i` lies where no car gets at it (see STRANDED_UP and STUCK_MOVE).
+func _ball_out_of_reach(i: int, delta: float) -> bool:
+	var b: RigidBody3D = _balls[i]
+	var p := b.global_position
+	var up := p.y - (_ball_spawn.y - 0.5) - 0.95
+	if up > STRANDED_UP and b.linear_velocity.length() < STRANDED_SPEED:
+		_ball_stranded[i] = float(_ball_stranded[i]) + delta
+	else:
+		_ball_stranded[i] = 0.0
+	var anchor: Array = _ball_anchor[i]
+	if p.distance_to(anchor[0]) > STUCK_MOVE:
+		_ball_anchor[i] = [p, 0.0]
+	else:
+		anchor[1] = float(anchor[1]) + delta
+	return float(_ball_stranded[i]) > STRANDED_TIME or float((_ball_anchor[i] as Array)[1]) > STUCK_TIME
 
 
 func _football_rules(delta: float) -> void:
@@ -391,6 +457,15 @@ func _football_rules(delta: float) -> void:
 			continue
 		var b: RigidBody3D = _balls[i]
 		var p := b.global_position
+		# In the net after a goal: it bursts when the moment is over, and comes back after the pause.
+		if float(_ball_linger[i]) > 0.0:
+			_ball_linger[i] = float(_ball_linger[i]) - delta
+			if float(_ball_linger[i]) <= 0.0:
+				_ball_fx_all("burst", i, p, int(_ball_side[i]), -1)
+				_set_ball_active(i, false, false)
+				if i == 0:
+					_ball_pause[0] = GOAL_PAUSE
+			continue
 		var best := TOUCH_REACH
 		for cart in _carts():
 			var d: float = cart.global_position.distance_to(p)
@@ -399,6 +474,9 @@ func _football_rules(delta: float) -> void:
 				_last_touch[i] = str(cart.name).to_int()
 		if p.y < _ball_spawn.y - 25.0 or p.distance_to(_ball_spawn) > 400.0:
 			_kickoff(i)
+			continue
+		if _ball_out_of_reach(i, delta):
+			_return_ball(i)
 			continue
 		for g in _goals.size():
 			var goal: Node3D = _goals[g]
@@ -413,8 +491,10 @@ func _goal_scored(ball: int, goal: int) -> void:
 	var scorer := int(_last_touch[ball])
 	var s_side := side_of(scorer)
 	var own := s_side == owner or scorer == 0
+	var fx_side := -1
 	if teams:
 		var beneficiary := 1 - owner
+		fx_side = beneficiary
 		_score[beneficiary] += 1
 		if not own:
 			_stat[scorer] = int(_stat.get(scorer, 0)) + 1
@@ -425,9 +505,72 @@ func _goal_scored(ball: int, goal: int) -> void:
 			_score[s_side] += 1
 			_stat[scorer] = int(_stat.get(scorer, 0)) + 1
 		_event_rpc_all("owngoal" if own else "goal", _name_of(scorer) if scorer != 0 else "", owner if own else s_side)
-	_set_ball_active(ball, false, false)
-	if ball == 0:
-		_ball_pause[0] = GOAL_PAUSE
+		fx_side = owner if own else s_side
+	# The ball flies on into the net and bursts there (_football_rules), in the colour of the side that gained.
+	_ball_side[ball] = fx_side
+	_ball_linger[ball] = GOAL_LINGER
+	_ball_fx_all("score", ball, (_balls[ball] as Node3D).global_position, fx_side, goal)
+
+
+func _ball_fx_all(what: String, ball: int, at: Vector3, side: int, goal: int) -> void:
+	if multiplayer.multiplayer_peer == null or multiplayer.multiplayer_peer is OfflineMultiplayerPeer:
+		_ball_fx_rpc(what, ball, at, side, goal)
+	else:
+		_ball_fx_rpc.rpc(what, ball, at, side, goal)
+
+
+## A ball's moment on every peer: "score" (it is in goal `goal`: it charges up, the goal lights), "burst" (it goes,
+## at `at`), "spawn" (it comes in at `at`), "reset" (a stranded one is taken from `at`).
+@rpc("authority", "call_local", "reliable")
+func _ball_fx_rpc(what: String, ball: int, at: Vector3, side: int, goal: int) -> void:
+	if _fx == null or ball < 0 or ball >= _balls.size():
+		return
+	var col := side_color(side) if side >= 0 else Color(0.62, 1.0, 0.3)
+	match what:
+		"score":
+			_ball_anim[ball] = ["charge", 0.0, col]
+			if goal >= 0 and goal < _goals.size():
+				_goal_flash[goal] = GOAL_FLASH
+				var g: Node3D = _goals[goal]
+				_fx.goal(g, float(g.get_meta(&"half_width", 6.0)), float(g.get_meta(&"height", 5.0)), col)
+		"burst":
+			_ball_anim[ball] = ["", 0.0, col]
+			_fx.burst(at, col)
+		"spawn":
+			_ball_anim[ball] = ["appear", 0.0, col]
+			(_balls[ball] as Node).call("set_fx", 0.02, 4.0, col)
+			_fx.spawn(at, _ball_spawn.y - 0.5, col)
+		"reset":
+			_fx.poof(at)
+
+
+## The balls' passing looks (KickBall.set_fx) and the goals' frames lighting up after a goal, on every peer.
+func _update_ball_fx(delta: float) -> void:
+	for i in _balls.size():
+		var a: Array = _ball_anim[i]
+		if str(a[0]) == "":
+			continue
+		a[1] = float(a[1]) + delta
+		var b: Node = _balls[i]
+		if str(a[0]) == "charge":
+			var k := clampf(float(a[1]) / GOAL_LINGER, 0.0, 1.0)
+			b.call("set_fx", 1.0 + 0.2 * k * k, 0.4 + 3.2 * k * k, a[2])
+		else:
+			var k := clampf(float(a[1]) / APPEAR_TIME, 0.0, 1.0)
+			# Out of nothing, a little past its size and back (a back ease).
+			var size := 1.0 + 2.70158 * pow(k - 1.0, 3.0) + 1.70158 * pow(k - 1.0, 2.0)
+			b.call("set_fx", size, 4.0 * pow(1.0 - k, 2.0), a[2])
+			if k >= 1.0:
+				a[0] = ""
+				b.call("set_fx", 1.0, 0.0, a[2])
+	for g in mini(_goal_flash.size(), _goal_vis.size()):
+		if _goal_flash[g] <= 0.0:
+			continue
+		_goal_flash[g] = maxf(0.0, _goal_flash[g] - delta)
+		var k := _goal_flash[g] / GOAL_FLASH
+		var energy := 0.55 + 6.0 * k * k * (0.78 + 0.22 * cos(_goal_flash[g] * 9.0))
+		for m in _goal_vis[g]:
+			(m as StandardMaterial3D).emission_energy_multiplier = energy
 
 
 # ---- Capture the flag --------------------------------------------------------------------------------------------
@@ -546,6 +689,8 @@ func _event_rpc(what: String, who: String, side: int) -> void:
 		"multiball":
 			text = "MULTIBALL!"
 			sound = SOUND_PICKUP
+		"ballreset":
+			text = "BALL BACK TO THE MIDDLE"
 		"pickup":
 			text = "%s HAS THE FLAG!" % who
 			sound = SOUND_PICKUP
@@ -807,6 +952,8 @@ func _process(delta: float) -> void:
 	if kind == "ctf":
 		_update_flag_vis(delta)
 		_update_base_vis()
+	else:
+		_update_ball_fx(delta)
 	_update_pips()
 	_update_arrows()
 	_update_huds()
@@ -1014,6 +1161,17 @@ func _build_goal_vis() -> void:
 				(n as GeometryInstance3D).material_override = m
 				mats.append(m)
 		_goal_vis.append(mats)
+		# Whose goal it is, over its bar on the pitch side of the glass.
+		var lab := Label3D.new()
+		lab.font_size = 96
+		lab.pixel_size = 0.0155
+		lab.outline_size = 18
+		lab.outline_modulate = Color(0, 0, 0, 0.9)
+		lab.double_sided = false
+		lab.position = Vector3(0, float((g as Node).get_meta(&"height", 5.0)) + 1.55, -0.5)
+		lab.rotation.y = PI
+		(g as Node).add_child(lab)
+		_goal_labels.append(lab)
 	_paint_goals()
 
 
@@ -1025,6 +1183,10 @@ func _paint_goals() -> void:
 		for m in _goal_vis[gi]:
 			(m as StandardMaterial3D).albedo_color = c
 			(m as StandardMaterial3D).emission = c
+		if gi < _goal_labels.size():
+			var lab: Label3D = _goal_labels[gi]
+			lab.text = _side_label(int(_goal_owner[gi])).to_upper() if c != NEUTRAL else ""
+			lab.modulate = c.lightened(0.3)
 
 
 # ---- Pips over the cars, arrows over the local players' ----------------------------------------------------------

@@ -15,6 +15,9 @@ render_mode blend_mix, cull_back, depth_draw_opaque;
 uniform int style = 0;
 uniform vec3 dirt : source_color = vec3(0.45, 0.33, 0.22);
 uniform float dirt_amount = 0.18;
+// A glow over the ball's own colours for a moment (KickBall.set_fx: the arena's goal and kick-off effects).
+instance uniform float fx_glow = 0.0;
+instance uniform vec3 fx_tint : source_color = vec3(1.0);
 
 varying vec3 v_dir;
 
@@ -113,7 +116,7 @@ void fragment() {
 		rough = 0.22;
 	}
 	ALBEDO = col;
-	EMISSION = emit;
+	EMISSION = emit + fx_tint * fx_glow * (0.35 + 0.65 * dot(col, vec3(0.333)));
 	ROUGHNESS = rough;
 	SPECULAR = 0.5;
 }
