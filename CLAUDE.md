@@ -4788,6 +4788,16 @@ each run deletes first).
   places none). Box colliders per building (`_building_boxes`); their footprints are noted, so the woods keep off.
   `res://scratch/proving_ground_preview.gd` (`-s`, windowed, `-- <dir> [set=pit,tower,workshop,office] name:x,y,z:tx,ty,tz`)
   renders them in memory in seconds. About 41k triangles.
+- The landscape: gentle swells in the meadows (`_natural`: away from the lap's corner polygon, `_lap_poly_d`, and off
+  `FLAT_RECTS`, the buildings, car parks and paddock), woods in patches (`_forest_w`: cedar, pine, maple, mountain cherry,
+  bamboo thickets, azaleas; the forest floor under them), cherry clumps and lone trees in the meadows (`_grove_w`, petals
+  under them), wildflower patches (`_build_meadow_flowers`: PondKit irises in five colours, "MeadowFlowers", soft).
+- The pond in the infield (`POND_BLOBS`, `POND_ISLAND`, `_water_d`, surface `POND_Y`, 1.3m deep at most, the grid halved
+  round it by `_extra_refine`): "PondWater" (still_water, its bounds in metas so PlayerCart floods only there), PondKit's
+  bulrushes, rushes, irises and water lilies, 14 koi circling (KoiFish.gd, Yoshino Rapids' fish mesh), a heron in the
+  western shallows (Heron.gd), a red drum bridge to the island (a lantern, a weeping cherry, azaleas), a timber jetty
+  (`ProvingGroundKit.jetty`), rocks, benches and lanterns round it (boxes in `PondSolids`), weeping cherries, red maples
+  and azaleas on its banks.
 
 ## Miyoshino GP (Senbon Sakura Pass, Yoshino Rapids, Monzenmachi, Yamabushi Trail)
 

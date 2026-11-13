@@ -833,3 +833,35 @@ static func light_mast(pk: PropKit, kit: Dictionary, h := 9.0) -> void:
 static func bollard(pk: PropKit, kit: Dictionary) -> void:
 	pk.tube(kit, "metal", Vector3.ZERO, Vector3(0, 0.95, 0), 0.1, 0.1, 10, Color(0.20, 0.22, 0.24))
 	pk.tube(kit, "glow", Vector3(0, 0.75, 0), Vector3(0, 0.82, 0), 0.105, 0.105, 10, ORANGE, false)
+
+
+## A timber jetty from a (on the bank) to b (over the water), its deck at their height: planks across stringers, posts in
+## pairs down to `bed_y`, a kerb along each edge, a ladder at its end, two mooring posts.
+static func jetty(pk: PropKit, kit: Dictionary, a: Vector3, b: Vector3, w: float, bed_y: float) -> void:
+	var l: float = a.distance_to(b)
+	var dir: Vector3 = (b - a) / maxf(l, 0.001)
+	var side: Vector3 = Vector3.UP.cross(dir).normalized()
+	var wood := Color(0.56, 0.42, 0.30)
+	var n: int = int(l / 0.24)
+	for i in n:
+		var c: Vector3 = a + dir * (0.12 + float(i) * 0.24)
+		box_at(pk, kit, "timber", c - Vector3(0, 0.03, 0), Basis(side, Vector3.UP, dir), Vector3(w, 0.06, 0.21), wood.darkened(0.08 * float(i % 3)))
+	for sx in [-0.38, 0.0, 0.38]:
+		pk.beam(kit, "timber", a + side * (w * sx) - Vector3(0, 0.16, 0), b + side * (w * sx) - Vector3(0, 0.16, 0), 0.12, 0.2, wood.darkened(0.25), Vector3.UP)
+	var k := 0.6
+	while k < l:
+		for sx in [-0.45, 0.45]:
+			var p: Vector3 = a + dir * k + side * (w * sx)
+			pk.tube(kit, "timber", Vector3(p.x, bed_y, p.z), p - Vector3(0, 0.05, 0), 0.09, 0.09, 8, wood.darkened(0.3))
+		k += 2.2
+	for sx in [-0.5, 0.5]:
+		pk.beam(kit, "timber", a + side * (w * sx) + Vector3(0, 0.05, 0), b + side * (w * sx) + Vector3(0, 0.05, 0), 0.1, 0.1, wood.darkened(0.15), Vector3.UP)
+	for sx in [-0.5, 0.5]:
+		var mp: Vector3 = b + side * (w * sx) - dir * 0.2
+		pk.tube(kit, "timber", mp - Vector3(0, 0.3, 0), mp + Vector3(0, 0.55, 0), 0.1, 0.1, 8, wood.darkened(0.2))
+	for sx in [-0.25, 0.25]:
+		var lp: Vector3 = b + side * (w * sx) + dir * 0.05
+		pk.beam(kit, "steel", lp - Vector3(0, 1.2, 0), lp + Vector3(0, 0.8, 0), 0.04, 0.04, Color(0.6, 0.62, 0.64))
+	for r in 4:
+		var ry: float = -0.9 + float(r) * 0.3
+		pk.beam(kit, "steel", b + side * (w * -0.25) + dir * 0.05 + Vector3(0, ry, 0), b + side * (w * 0.25) + dir * 0.05 + Vector3(0, ry, 0), 0.03, 0.03, Color(0.6, 0.62, 0.64))
