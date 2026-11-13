@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/cars/jukebox_body.res" id="1_ffsgn"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/jukebox_wheel_l.res" id="2_5xcf4"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/jukebox_wheel_r.res" id="3_3jrhq"]
+
+[node name="Jukebox" type="Node3D" unique_id=1097728277]
+metadata/procedural_car = true
+
+[node name="Model" type="Node3D" parent="." unique_id=1306023181]
+transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
+
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=980766624]
+mesh = ExtResource("1_ffsgn")
+metadata/car_shader = true
+
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=1369644694]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.455, 0.215, -0.78)
+mesh = ExtResource("2_5xcf4")
+metadata/car_shader = true
+
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=892454097]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.455, 0.215, -0.78)
+mesh = ExtResource("3_3jrhq")
+metadata/car_shader = true
+
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=711513581]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.43, 0.215, 0.74)
+mesh = ExtResource("2_5xcf4")
+metadata/car_shader = true
+
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=1533766652]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.43, 0.215, 0.74)
+mesh = ExtResource("3_3jrhq")
+metadata/car_shader = true
+
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=436230082]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 0.482, 0.95)

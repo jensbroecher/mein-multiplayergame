@@ -168,7 +168,12 @@ static func parapet(pk: PropKit, kit: Dictionary, plan: PackedVector2Array, y: f
 		var e: Vector2 = q - p
 		var out2 := Vector2(e.y, -e.x).normalized() if ccw else Vector2(-e.y, e.x).normalized()
 		var inn: Vector2 = -out2 * th
-		wall(pk, kit, Vector3(p.x, 0, p.y), Vector3(q.x, 0, q.y), y - 0.02, y + h, Vector3(out2.x, 0, out2.y), tint, STYLE_CLADDING, 0)
+		# The outer face 3cm proud of the wall under it (in its plane, the 2cm it reaches down flickered along every roof).
+		var po: Vector2 = p + out2 * 0.03
+		var qo: Vector2 = q + out2 * 0.03
+		wall(pk, kit, Vector3(po.x, 0, po.y), Vector3(qo.x, 0, qo.y), y - 0.12, y + h, Vector3(out2.x, 0, out2.y), tint, STYLE_CLADDING, 0)
+		pk.quad(kit, "tower", [Vector3(p.x, y + h, p.y), Vector3(po.x, y + h, po.y), Vector3(qo.x, y + h, qo.y), Vector3(q.x, y + h, q.y)], Vector3.UP,
+				_style_col(tint.lightened(0.2), STYLE_CONCRETE), [p, po, qo, q])
 		wall(pk, kit, Vector3(q.x + inn.x, 0, q.y + inn.y), Vector3(p.x + inn.x, 0, p.y + inn.y), y, y + h, Vector3(-out2.x, 0, -out2.y), tint, STYLE_CONCRETE, 0)
 		pk.quad(kit, "tower", [Vector3(p.x, y + h, p.y), Vector3(q.x, y + h, q.y), Vector3(q.x + inn.x, y + h, q.y + inn.y), Vector3(p.x + inn.x, y + h, p.y + inn.y)],
 				Vector3.UP, _style_col(tint.lightened(0.2), STYLE_CONCRETE), [p, q, q + inn, p + inn])

@@ -1,0 +1,19 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://car_body.gdshader" id="1_137ao"]
+[ext_resource type="Texture2D" path="res://generated/cars/jukebox_detail.res" id="2_0b7ep"]
+
+[resource]
+render_priority = -1
+shader = ExtResource("1_137ao")
+shader_parameter/detail_map = ExtResource("2_0b7ep")
+shader_parameter/nose_z = -1.3
+shader_parameter/tail_z = 1.34
+shader_parameter/belt_y = 0.378
+shader_parameter/side_x = 0.535
+shader_parameter/door_roundel = Vector2(-0.09, 0.436)
+shader_parameter/roundel_r = 0.048
+shader_parameter/hood_z = -0.88
+shader_parameter/hood_r = 0.08
+shader_parameter/stripe_w = 0.08
+shader_parameter/stripe_gap = 0.035

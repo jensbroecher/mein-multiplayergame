@@ -362,6 +362,19 @@ const CAR_PRESETS = [
 		"offroad": 9.2,
 		"desc": "A fan buggy: a slim one-seat tub on skinny front wheels and fat sand tyres, with a big ducted propeller and two rudders behind the driver. The best thing on the grid in sand and dirt and light on its feet; on tarmac it floats wide in the corners.",
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Jukebox",
+		"model_path": "res://generated/cars/Jukebox.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 43.0,
+		"acceleration": 54.0,
+		"steer_speed": 2.1,
+		"grip": 5.8,
+		"braking": 36.0,
+		"offroad": 3.0,
+		"desc": "A 1950s tailfin cruiser: hooded headlamps, a wraparound screen, chrome from bumper to bumper and whitewalls under skirts. The longest car on the grid and the heaviest that isn't a truck: slow to get going and slow to turn, but planted and fast once it rolls, and it shoves lighter cars aside.",
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 
@@ -378,6 +391,7 @@ const CAR_ACCENTS := {
 	"Bootlegger": Color(1.0, 0.48, 0.14), "Meteor": Color(0.86, 0.88, 0.92), "Kugelblitz": Color(0.45, 0.88, 0.76),
 	"Sandpiper": Color(0.22, 0.84, 0.88), "Samurai": Color(0.98, 0.36, 0.20),
 	"Ninja": Color(0.95, 0.22, 0.34), "Crimson": Color(1.0, 0.18, 0.22), "Typhoon": Color(1.0, 0.72, 0.10),
+	"Jukebox": Color(1.0, 0.56, 0.72),
 }
 ## Stat bars: caption, preset key, and the values at an empty and a full bar (spanning the fleet).
 const STATS := [

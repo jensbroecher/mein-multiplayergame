@@ -466,6 +466,25 @@ const CAR_PRESETS = [
 		"offroad": 9.2,
 		"weight": 0.80,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Jukebox",
+		# A big, lazy cross-plane V8 through twin pipes, synthesised (scratch/synth_engine_jukebox.py: a seamless 2s
+		# loop, its burble from the uneven firing down each pipe), levelled by its RMS (-18.0 dBFS). An ElevenLabs
+		# take can replace it.
+		"engine_sound": "res://sounds/enginesounds/engine_jukebox_loop.wav",
+		"engine_gain_db": 8.3,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes.
+		"model_path": "res://generated/cars/Jukebox.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 43.0,
+		"acceleration": 54.0,
+		"steer_speed": 2.1,
+		"grip": 5.8,
+		"braking": 36.0,
+		"offroad": 3.0,
+		"weight": 1.22,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

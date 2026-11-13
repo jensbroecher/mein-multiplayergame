@@ -3112,7 +3112,11 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
   `ANTENNA_POS`), add it to `regenerate_cars.gd`'s `CARS` and its factory paint to `CarPaint.FACTORY`, then
   point the preset in both PlayerCart and CarSelection at `generated/cars/<Name>.tscn`. A new car (not a
   rebuild) also needs a preset appended to both lists (they're indexed, so append), a `weight` in PlayerCart's (see
-  "Car weights"), a `CAR_ACCENTS` colour and its name in `Lobby.CAR_NAMES`.
+  "Car weights"), a `CAR_ACCENTS` colour, its name in `Lobby.CAR_NAMES` and a gallery in `CarCollection.CATEGORIES`.
+  `res://scratch/car_registry_check.gd` (`-s`, headless) checks all of that for every car (same cars, order and stats
+  in both preset lists, accent, factory paint, gallery, description, a model and an engine loop that load). It reports
+  the Trailblazer, whose steer_speed, grip and braking differ between PlayerCart (2.8, 5.4, 46) and CarSelection (2.5,
+  5.0, 40): left as found.
 - The Apex overrides `section()` to cut its wheel wells as notches (the bottom steps up an inner wall
   `x_well` to the arch's ceiling, then out round the fender's lip), instead of lifting the whole bottom over
   each wheel like the other cars. That lets its open bed's floor sit below the arches, between the rear
@@ -3203,6 +3207,30 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
     stood 8cm off the nose at its ends), the bumpers' path follows the face (kept within x 0.24, or `shell_z` found the
     face behind the arch). Through the bubble the dark cabin reads grey under a bright sky: that is the glass's
     reflection, not the detail map.
+  - The Jukebox (`JukeboxBuilder.gd`, a 1950s-style tailfin cruiser; the fifth classic, added because the Classics were
+    the smallest gallery): the longest car (2.64m, -1.30 to 1.34) and the heaviest that isn't a truck (weight 1.22:
+    fast, planted, slow to launch and to turn). The Samurai's keyed corner section with one more key, `pow`: the top
+    runs from the centre line out to the corner as `top + (edge - top) (x / px)^pow` (`_top_at`), so with the corner
+    above the centre line and pow 5-7 it is a flat deck sweeping up into a fin, and pow 2 is the Samurai's crowned
+    roof. `_corner` no longer clamps the edge under the top. The top is two segments meeting at `TOP_SPLIT` of px (the
+    fin's inner face, the deck), so the fin's steep face keeps its ring points. The fins fold the outline back in y,
+    so `shell_z()` is the Nocturne's point-in-polygon one. Rear skirts: the rear arch (`REAR_ARCH`) is lifted only to
+    0.335, under the tyre's top (0.43), and the rear track is narrower (`WHEEL_XR` 0.430 against `WHEEL_XF` 0.455) so
+    the tyre and hubcap stay inside the body's side; the tyre's top is simply inside the shell. The glass is one pane
+    (the min of the side glass's, windscreen's and rear glass's distances, then one seal and chrome surround round
+    the lot): ahead of the A-post (`POST_Z`, near the header) the side glass and the windscreen both reach over the
+    corner's rounding, so the screen wraps round into the side; the post and the hardtop's glass joint are chrome
+    strips drawn over it. The chrome spear (`SPEAR_Y`, detail map B; a short piece ahead of the front arch too) lies
+    on the two-tone's split: `PAINT_LAYOUT.belt_y` is `SPEAR_Y` + 0.006, which puts the pattern's pinline under the
+    chrome. In Two-Tone the secondary colour is the one above the split, so "pink over ivory" is primary ivory,
+    secondary "Jukebox Pink". Headlamp pods and the jet-pipe tail lamps are lathes on `face_frame` (`_lathe`: facing
+    away from its axis, or toward it for the inside of a pipe); a chrome bead runs along the roof's corner and each
+    fin's crest (`_corner_rail`, capped like the shell in the tail cap). Wide whitewalls (a band lying on the outer
+    sidewall) on steel wheels in the rim colour under chrome hubcaps with a three-bladed spinner. Its engine loop is
+    synthesised (`scratch/synth_engine_jukebox.py`, as the Typhoon's: a cross-plane V8's uneven firing down two pipes
+    gives the burble); the first take had most of its energy under 80 Hz against the other loops' 80-640 Hz and was
+    rebalanced by its spectrum. Nobody has listened to it yet. On the car select screen its nose passes behind the
+    paint shop's panel at some turntable angles.
 - The Sandpiper (`SandpiperBuilder.gd`, in the Buggies gallery): a 1960s-style beach buggy, an original design with a
   made-up name, picked to stand apart from the other buggies (the Shadow, the Centurion, the Vortex: all caged, all
   winged): rounded and low, no cage or wing, the fenders part of the body, the engine bare at the back. Its section is
@@ -4990,7 +5018,8 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   a bot that runs wide past the way in drives along the north wall outside and is respawned (about one in 18).
   The mall's plan is square (chamfered, the roofs' square corners stood out past its walls, under their tops), the hall's
   outer walls run to each other's faces at the corners, and YunhaiStage's `_roof` parapets reach down past the roof's
-  surface (from y - 0.1 a slot under them showed the lit facade below).
+  surface (from y - 0.1 a slot under them showed the lit facade below), their outer face 4cm proud of the wall under it
+  (in its plane it flickered along every roof's edge); MegacityKit's `parapet` likewise stands 3cm proud.
 - The drone show (`DroneShow.gd`, `drone_show.gdshader`, the user's idea; `DRONE_SHOW_AT` south-east of the park, 205m up,
   `show_scale` 1.3, facing back toward the night market street and the run to the finish): 2,000 drones form a dragon
   chasing its flaming pearl (its body waving), a peony, three swaying red lanterns, two koi circling among ripples, and the

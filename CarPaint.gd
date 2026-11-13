@@ -33,6 +33,7 @@ const PALETTE := [
 	["Shadow Violet", Color(0.46, 0.20, 0.82)], ["Surf Turquoise", Color(0.04, 0.58, 0.68)],
 	["Samurai Vermilion", Color(0.84, 0.19, 0.07)], ["Ninja Indigo", Color(0.09, 0.11, 0.24)],
 	["Crimson", Color(0.62, 0.04, 0.07)], ["Typhoon Yellow", Color(0.98, 0.70, 0.06)],
+	["Jukebox Pink", Color(0.97, 0.56, 0.64)],
 ]
 const RIMS := [
 	["Silver", Color(0.76, 0.77, 0.79)], ["Titanium", Color(0.46, 0.47, 0.49)], ["Gunmetal", Color(0.22, 0.23, 0.25)],
@@ -121,6 +122,9 @@ const FACTORY := {
 	"Typhoon": {"pattern": 1, "finish": 0, "primary": Color(0.98, 0.70, 0.06),
 		"secondary": Color(0.03, 0.03, 0.035), "accent": Color(0.05, 0.45, 0.85),
 		"rim": Color(0.05, 0.05, 0.055), "number": 88},
+	"Jukebox": {"pattern": 2, "finish": 0, "primary": Color(0.95, 0.91, 0.80),
+		"secondary": Color(0.97, 0.56, 0.64), "accent": Color(0.16, 0.66, 0.66),
+		"rim": Color(0.92, 0.92, 0.90), "number": 59},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),
