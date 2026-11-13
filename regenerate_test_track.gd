@@ -157,12 +157,277 @@ func _build_dressing(root: Node3D) -> void:
 	var fin: float = _finish_s()
 	_build_start_crowd(root, fin - 70.0, fin + 70.0, road_half + 3.0, fin - 8.0, fin + 8.0, seed_base + 11)
 	_build_paddock(root)
+	_build_buildings(root)
 	_build_cones(root)
 	# Guardrails round the outside of the corners (every corner turns right: the outside is the left).
 	var body: StaticBody3D = _body(root, "GuardrailBody_Lap")
 	for c in [Vector2(300.0, -120.0), Vector2(300.0, 170.0), Vector2(-280.0, STRIP_Z), Vector2(-280.0, -120.0)]:
 		var sc: float = lap.closest_s(c)
 		_rails(body, sc - 60.0, sc + 60.0, -1.0)
+
+
+# ======================================================================================
+#  The proving ground's buildings
+# ======================================================================================
+
+const PGK = preload("res://ProvingGroundKit.gd")
+## [builder, x, z, yaw (degrees: 0 faces +z, south), range]. The pit building and the office face the start straight
+## from the north, in the sun; the control tower (the 3D logo turning on its roof) and the Tech Centre face it from the
+## infield.
+const BUILDINGS := [["pit", 30.0, -161.2, 0.0, 0.0], ["office", -207.0, -178.0, 0.0, 1600.0],
+	["tower", -55.0, -70.0, 180.0, 0.0], ["workshop", 178.0, -75.0, 180.0, 1600.0]]
+## The logo on the tower, in model units to game metres (the model is 9 x 3.4m: 21.6m across here), turning slowly.
+const LOGO_SCALE := 2.4
+const LOGO_SPIN := 9.0
+
+var _bld_mats := {}
+var _sign_font: Font
+
+
+## Each building one mesh (ProvingGroundKit, life size grown by PROP_SCALE) with its signs, box colliders (nothing on
+## this level gets them from DressingColliders), its footprint noted so the woods keep off; paved aprons before the pit
+## building and the Tech Centre (track: a car can drive in), car parks, light masts, the logo on the tower, flags.
+func _build_buildings(root: Node3D) -> void:
+	var holder := Node3D.new()
+	holder.name = "ProvingGround"
+	root.add_child(holder)
+	var body := StaticBody3D.new()
+	body.name = "BuildingsBody"
+	body.set_meta(&"surface", "rock")
+	holder.add_child(body)
+	_sign_font = load("res://fonts/NotoSansSC-Yunhai.otf")
+	for b in BUILDINGS:
+		var kind: String = b[0]
+		var yaw: float = deg_to_rad(float(b[3]))
+		var c := Vector3(float(b[1]), 0.0, float(b[2]))
+		c.y = _ground_at(c.x, c.z)
+		var xf := Transform3D(Basis(Vector3.UP, yaw), c)
+		var pk = PGK.new_kit(PROP_SCALE)
+		pk.set_frame(Transform3D(xf.basis * Basis.from_scale(Vector3.ONE * PROP_SCALE), xf.origin))
+		var kit := {}
+		var labels: Array = []
+		match kind:
+			"pit": PGK.pit_building(pk, kit, labels)
+			"tower": PGK.control_tower(pk, kit, labels)
+			"workshop": PGK.workshop(pk, kit, labels)
+			"office": PGK.office(pk, kit, labels)
+		var frame: Transform3D = pk.xf
+		var mi := MeshInstance3D.new()
+		mi.name = kind.to_pascal_case()
+		mi.mesh = _save_building_mesh(PGK.commit(pk, kit), "building_" + kind)
+		if float(b[4]) > 0.0:
+			mi.visibility_range_end = float(b[4])
+		holder.add_child(mi)
+		for l in labels:
+			_building_label(mi, String(l[0]), frame * (l[1] as Vector3), (xf.basis * (l[2] as Vector3)).normalized(),
+					float(l[3]) * PROP_SCALE, l[4], float(l[5]) * PROP_SCALE if l.size() > 5 else 0.0)
+		# Colliders and the footprint.
+		for bx in _building_boxes(kind):
+			var lo := Vector3(bx[0], 0.0, bx[2])
+			var hi := Vector3(bx[1], bx[4], bx[3])
+			_box_shape(body, Transform3D(xf.basis, xf * (((lo + hi) * 0.5) * PROP_SCALE)), (hi - lo) * PROP_SCALE)
+		var fp: Array = PGK.footprint(kind)
+		_note_frame(xf, Vector2(fp[0], fp[2]), Vector2(fp[1], fp[3]), 6.0)
+		if kind == "tower":
+			_tower_logo(holder, xf)
+			# Two flags either side of the lobby's canopy, streaming away from the road.
+			for sx in [-11.0, 11.0]:
+				var fpos: Vector3 = xf * (Vector3(sx, 0.0, 11.0) * PROP_SCALE)
+				fpos.y = _ground_at(fpos.x, fpos.z)
+				var flag := Node3D.new()
+				flag.name = "LogoFlag_Tower%d" % (0 if sx < 0.0 else 1)
+				flag.set_script(load("res://LogoFlag.gd"))
+				flag.set("pole_height", 12.0)
+				var fly := Vector3(signf(sx), 0, 0)
+				flag.transform = Transform3D(Basis(fly, Vector3.UP, fly.cross(Vector3.UP)), fpos)
+				holder.add_child(flag)
+	_build_aprons(holder)
+	_build_car_parks(holder)
+
+
+## Box colliders per building: [x0, x1, z0, z1, height] in its frame, life metres.
+func _building_boxes(kind: String) -> Array:
+	match kind:
+		"pit":
+			return [[-30.4, 30.4, -6.3, 6.95, 10.4], [30.4, 33.2, -3.6, 6.6, 9.2]]
+		"tower":
+			return [[-9.6, 9.6, -6.6, 6.6, 5.6], [-3.6, 3.6, -4.1, 3.1, 35.0], [-3.2, 3.2, 8.7, 9.3, 3.6]]
+		"workshop":
+			return [[-12.3, 12.3, -15.4, 15.4, 10.0], [12.0, 18.4, -2.3, 12.4, 4.2], [-8.2, 16.2, 15.4, 15.7, 6.0]]
+		"office":
+			return [[-13.2, 13.2, -7.2, 8.0, 11.8], [13.0, 17.3, -3.3, 3.3, 13.2], [-11.8, -6.4, 10.3, 10.7, 3.2]]
+	return []
+
+
+func _save_building_mesh(mesh: ArrayMesh, mesh_name: String) -> Resource:
+	for si in range(mesh.get_surface_count()):
+		var m: Material = mesh.surface_get_material(si)
+		if m == null or not m.resource_path.is_empty():
+			continue
+		var id: int = m.get_instance_id()
+		if not _bld_mats.has(id):
+			_bld_mats[id] = _save_res(m, "bldmat_%d" % _bld_mats.size(), stem + "prop_")
+		mesh.surface_set_material(si, _bld_mats[id])
+	return _save_res(mesh, mesh_name, stem + "prop_")
+
+
+## A sign's letters (the kit's labels: cap height and board width in game metres), in Noto Sans Bold.
+func _building_label(parent: Node3D, text: String, at: Vector3, n: Vector3, cap: float, col: Color, max_w: float) -> void:
+	var lab := Label3D.new()
+	lab.text = text
+	lab.font = _sign_font
+	lab.font_size = 64
+	var pixel: float = cap / 44.8
+	if max_w > 0.0:
+		var w: float = _sign_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 64).x
+		pixel = minf(pixel, max_w / maxf(w, 1.0))
+	lab.pixel_size = pixel
+	lab.modulate = col
+	lab.outline_size = 0
+	lab.double_sided = false
+	lab.alpha_cut = Label3D.ALPHA_CUT_DISCARD
+	lab.transform = Transform3D(Basis.looking_at(-n, Vector3.UP), at)
+	parent.add_child(lab)
+
+
+## The 3D logo (generated/logo/RcVibeLogo.tscn) back to back on the tower's post, turning slowly (Spinner.gd, wall clock).
+func _tower_logo(holder: Node3D, xf: Transform3D) -> void:
+	var spin := Node3D.new()
+	spin.name = "TowerLogo"
+	spin.set_script(load("res://Spinner.gd"))
+	spin.set("axis", Vector3.UP)
+	spin.set("degrees_per_second", LOGO_SPIN)
+	spin.position = xf * (Vector3(0, PGK.TOWER_LOGO_Y, -0.5) * PROP_SCALE)
+	holder.add_child(spin)
+	var size: Vector3 = Vector3(9.0, 3.416, 0.584)
+	for k in 2:
+		var logo: Node3D = (load("res://generated/logo/RcVibeLogo.tscn") as PackedScene).instantiate()
+		logo.name = "Logo%d" % k
+		logo.scale = Vector3.ONE * LOGO_SCALE
+		logo.rotation.y = PI * float(k)
+		logo.position = Vector3(0, size.y * 0.5 * LOGO_SCALE, 0)
+		spin.add_child(logo)
+
+
+## Concrete aprons before the pit building (to the road's edge) and the Tech Centre: a slab 6cm up with painted bay
+## boxes, solid and track ("...Road"), so a car can drive off the straight onto them.
+func _build_aprons(holder: Node3D) -> void:
+	var pk = PGK.new_kit(1.0)
+	var kit := {}
+	var body := StaticBody3D.new()
+	body.name = "PitApronRoad"
+	body.set_meta(&"surface", "asphalt")
+	holder.add_child(body)
+	# [x0, x1, z0 (the building's side), z1 (the road's edge), bay lines every (0: none)]: the pit apron north of the
+	# straight, the Tech Centre's south of it.
+	var aprons := [[-19.0, 79.0, -150.0, -120.0 - road_half - 0.4, 9.6], [151.0, 198.0, -100.0, -120.0 + road_half + 0.4, 0.0]]
+	for a in aprons:
+		var x0: float = a[0]
+		var x1: float = a[1]
+		var z0: float = minf(a[2], a[3])
+		var z1: float = maxf(a[2], a[3])
+		var y: float = maxf(maxf(_ground_at(x0, z0), _ground_at(x1, z0)), maxf(_ground_at(x0, z1), _ground_at(x1, z1))) + 0.06
+		PGK.blk(pk, kit, "concrete", Vector3(x0, y - 0.5, z0), Vector3(x1, y, z1), Color(0.70, 0.70, 0.68))
+		var col := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(x1 - x0, 0.5, z1 - z0)
+		col.shape = shape
+		col.position = Vector3((x0 + x1) * 0.5, y - 0.25, (z0 + z1) * 0.5)
+		body.add_child(col)
+		# A white line round it, bay lines across, a yellow pit-lane line along its middle.
+		var w := 0.15
+		for e in [[x0, z0, x1, z0 + w], [x0, z1 - w, x1, z1], [x0, z0, x0 + w, z1], [x1 - w, z0, x1, z1]]:
+			PGK.blk(pk, kit, "alu", Vector3(e[0], y, e[1]), Vector3(e[2], y + 0.012, e[3]), Color(0.92, 0.92, 0.90))
+		if float(a[4]) > 0.0:
+			var bx: float = x0 + 1.4
+			while bx < x1:
+				PGK.blk(pk, kit, "alu", Vector3(bx - 0.08, y, z0 + 0.2), Vector3(bx + 0.08, y + 0.012, z0 + 9.0), Color(0.92, 0.92, 0.90))
+				bx += float(a[4])
+			PGK.blk(pk, kit, "alu", Vector3(x0 + 0.5, y, z0 + 11.0), Vector3(x1 - 0.5, y + 0.012, z0 + 11.2), Color(0.95, 0.78, 0.10))
+		_note_rect(Vector2((x0 + x1) * 0.5, (z0 + z1) * 0.5), x1 - x0, z1 - z0, 0.0, 2.0)
+	var mi := MeshInstance3D.new()
+	mi.name = "Aprons"
+	mi.mesh = _save_building_mesh(PGK.commit(pk, kit), "aprons")
+	holder.add_child(mi)
+	# Light masts along the pit apron's back and the Tech Centre's apron.
+	var mk = PGK.new_kit(PROP_SCALE)
+	var mkit := {}
+	var spots: Array = []
+	var x := -14.0
+	while x < 78.0:
+		spots.append(Vector3(x, 0, -147.5))
+		x += 23.0
+	for sx in [154.0, 195.0]:
+		spots.append(Vector3(sx, 0, -102.5))
+	for sp in spots:
+		var p: Vector3 = sp
+		p.y = _ground_at(p.x, p.z)
+		mk.set_frame(Transform3D(Basis(Vector3.UP, 0.0 if p.z < -120.0 else PI).scaled(Vector3.ONE * PROP_SCALE), p))
+		PGK.light_mast(mk, mkit, 7.5)
+		_box_shape(body_or(holder), Transform3D(Basis(), p + Vector3(0, 6.0, 0)), Vector3(0.4, 12.0, 0.4))
+	mk.reset_frame()
+	var mm := MeshInstance3D.new()
+	mm.name = "LightMasts"
+	mm.mesh = _save_building_mesh(PGK.commit(mk, mkit), "light_masts")
+	mm.visibility_range_end = 1200.0
+	holder.add_child(mm)
+
+
+func body_or(holder: Node3D) -> StaticBody3D:
+	return holder.get_node("BuildingsBody") as StaticBody3D
+
+
+## Car parks beside the office and the tower: asphalt with bay lines, CampKit cars in some bays (box colliders).
+func _build_car_parks(holder: Node3D) -> void:
+	var pk := PropKit.new()
+	pk.material_for = func(key: String) -> Material: return _camp_material(key)
+	var camp := CampKit.new(pk)
+	var kit := {}
+	var lk = PGK.new_kit(1.0)
+	var lkit := {}
+	var body := body_or(holder)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_base + 77
+	var cols := [Color(0.92, 0.92, 0.90), Color(0.10, 0.10, 0.12), Color(0.55, 0.10, 0.10), Color(0.20, 0.30, 0.55),
+		Color(0.65, 0.67, 0.70), Color(0.85, 0.45, 0.08)]
+	# [x0, x1, z0, z1]: two rows of bays facing a middle aisle along x.
+	for lot in [[-180.0, -146.0, -188.0, -160.0], [-112.0, -78.0, -86.0, -58.0]]:
+		var x0: float = lot[0]
+		var x1: float = lot[1]
+		var z0: float = lot[2]
+		var z1: float = lot[3]
+		var y: float = maxf(_ground_at(x0, z0), _ground_at(x1, z1)) + 0.05
+		PGK.blk(lk, lkit, "matte", Vector3(x0, y - 0.4, z0), Vector3(x1, y, z1), Color(0.20, 0.21, 0.22))
+		var bay := 4.4
+		var depth := 9.0
+		var n: int = int((x1 - x0) / bay)
+		for row in 2:
+			var zr: float = z0 if row == 0 else z1 - depth
+			for i in n + 1:
+				var bx: float = x0 + float(i) * bay
+				PGK.blk(lk, lkit, "alu", Vector3(bx - 0.06, y, zr + 0.3), Vector3(bx + 0.06, y + 0.01, zr + depth - 0.3), Color(0.9, 0.9, 0.88))
+			for i in n:
+				if rng.randf() < 0.35:
+					continue
+				var cx: float = x0 + (float(i) + 0.5) * bay
+				var cz: float = zr + depth * 0.5
+				var yaw: float = 0.0 if row == 0 else PI
+				pk.set_frame(Transform3D(Basis(Vector3.UP, yaw + rng.randf_range(-0.04, 0.04)).scaled(Vector3.ONE * PROP_SCALE),
+						Vector3(cx, y, cz)))
+				camp.vehicle(kit, "suv" if rng.randf() < 0.5 else "van", cols[rng.randi() % cols.size()], rng.randi() % 2)
+				_box_shape(body, Transform3D(Basis(Vector3.UP, yaw), Vector3(cx, y + 1.5 * PROP_SCALE * 0.6, cz)),
+						Vector3(2.0, 1.8, 5.2) * PROP_SCALE)
+		_note_rect(Vector2((x0 + x1) * 0.5, (z0 + z1) * 0.5), x1 - x0, z1 - z0, 0.0, 3.0)
+	pk.reset_frame()
+	var mi := MeshInstance3D.new()
+	mi.name = "CarParkCars"
+	mi.mesh = _save_res(pk.commit(kit), "carpark_cars", stem + "prop_")
+	mi.visibility_range_end = 900.0
+	holder.add_child(mi)
+	var li := MeshInstance3D.new()
+	li.name = "CarParkPaving"
+	li.mesh = _save_building_mesh(PGK.commit(lk, lkit), "carpark_paving")
+	holder.add_child(li)
 
 
 ## Guardrail pieces along the lap from s0 to s1 on one side (-1 left), with a box collider along them.

@@ -4778,6 +4778,16 @@ each run deletes first).
   box and post cylinders, the cones a KnockableProps MultiMesh (as Lakeside's), the guardrails a box per drawn piece
   on the ground it stands on, the paddock's gazebo legs, walls and tables boxes. `scratch/collision_audit ... reach=60`
   lists only the ground chunks and the motorhome's awning legs.
+- The buildings (`_build_buildings`, `BUILDINGS`, `ProvingGroundKit.gd`, life size at PROP_SCALE, labels in Noto Sans Bold):
+  north of the start straight the pit building (ten garages, three open with a lift, cabinets and a team banner inside, a
+  glazed first floor behind a balcony, the name and logo on the roof's fascia, a roof terrace with race control in a glass
+  box) and the Engineering office; in the infield the control tower (a chamfered shaft, a cab of leaning glass, the 3D logo
+  `generated/logo/RcVibeLogo.tscn` back to back at `LOGO_SCALE` turning on a post over it, Spinner.gd) and the Tech
+  Centre (a barrel-roofed workshop, one door leaf slid back on a lit bay). Concrete aprons before the pit building and the
+  Tech Centre are track (`PitApronRoad`), car parks with CampKit cars, light masts, two LogoFlags at the tower (so Level.gd
+  places none). Box colliders per building (`_building_boxes`); their footprints are noted, so the woods keep off.
+  `res://scratch/proving_ground_preview.gd` (`-s`, windowed, `-- <dir> [set=pit,tower,workshop,office] name:x,y,z:tx,ty,tz`)
+  renders them in memory in seconds. About 41k triangles.
 
 ## Miyoshino GP (Senbon Sakura Pass, Yoshino Rapids, Monzenmachi, Yamabushi Trail)
 
