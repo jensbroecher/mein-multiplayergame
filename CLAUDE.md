@@ -4773,6 +4773,11 @@ each run deletes first).
   knows it as TestTrack).
 - AI races (`scratch/ai_race_test`, speed=2): every bot finishes, no falls (the respawns are bombs and missiles), flying
   laps 36-44s.
+- "track" is in the level's name, so DressingColliders gives none of its single meshes a collider (`MESH_SKIP` looks
+  three ancestors up, the level's root included): every prop brings its own. The signs are StaticBody3Ds with a board
+  box and post cylinders, the cones a KnockableProps MultiMesh (as Lakeside's), the guardrails a box per drawn piece
+  on the ground it stands on, the paddock's gazebo legs, walls and tables boxes. `scratch/collision_audit ... reach=60`
+  lists only the ground chunks and the motorhome's awning legs.
 
 ## Miyoshino GP (Senbon Sakura Pass, Yoshino Rapids, Monzenmachi, Yamabushi Trail)
 

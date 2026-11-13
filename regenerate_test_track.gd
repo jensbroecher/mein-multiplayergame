@@ -175,16 +175,24 @@ func _rails(body: StaticBody3D, s0: float, s1: float, side: float) -> void:
 		a.y = _ground_at(a.x, a.z)
 		b.y = _ground_at(b.x, b.z)
 		_put_world("guard", a, prop_kit, "guardrail", [_life(a), _life(b)], 600.0)
+		# A box along the piece as drawn, on the ground it stands on (the lap's own height is metres off it on the
+		# hill's corners).
+		var l: float = a.distance_to(b)
+		if l > 0.1:
+			var fwd: Vector3 = (b - a) / l
+			var x: Vector3 = Vector3.UP.cross(fwd).normalized()
+			_box_shape(body, Transform3D(Basis(x, fwd.cross(x).normalized(), fwd).orthonormalized(),
+					(a + b) * 0.5 + Vector3(0, 0.5, 0)), Vector3(0.4, 1.8, l + 0.3))
 		s = sb
-	_edge_boxes(body, lap, s0, s1, side * (lap.half + 4.0), 1.2, 0.4)
 
 
-## Cones along both edges of the chicane and on the hairpin's apex.
+## Cones along both edges of the chicane and on the hairpin's apex: knocked flying by any cart (KnockableProps, as on
+## Lakeside). DressingColliders gives nothing on this level a collider ("track" is in the level's name), so every prop
+## here brings its own.
 func _build_cones(root: Node3D) -> void:
 	var pk := PropKit.new()
 	pk.material_for = func(key: String) -> Material: return _camp_material(key)
 	var camp := CampKit.new(pk)
-	var kit := {}
 	var spots: Array = []
 	var s: float = s_chic0 - 10.0
 	while s < s_chic1 + 10.0:
@@ -193,17 +201,35 @@ func _build_cones(root: Node3D) -> void:
 		s += 5.0
 	for k in range(-3, 4):
 		spots.append(lap.spot(s_hairpin + float(k) * 4.0, lap.half + 0.6, 0.0)["pos"])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_base + 41
+	var xfs: Array[Transform3D] = []
 	for p in spots:
 		var q: Vector3 = p
 		q.y = _ground_at(q.x, q.z)
-		pk.set_frame(Transform3D(Basis().scaled(Vector3.ONE * PROP_SCALE), q))
-		camp.cone(kit)
+		xfs.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), q))
+	var kit := {}
+	pk.set_frame(Transform3D(Basis().scaled(Vector3.ONE * PROP_SCALE), Vector3.ZERO))
+	camp.cone(kit)
 	pk.reset_frame()
-	var mi := MeshInstance3D.new()
-	mi.name = "Cones"
-	mi.mesh = _save_res(pk.commit(kit), "cones", stem + "prop_")
-	mi.visibility_range_end = 500.0
-	root.add_child(mi)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = _save_res(pk.commit(kit), "cone", stem + "prop_")
+	mm.instance_count = xfs.size()
+	mm.buffer = PropKit.transform_buffer(xfs)
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "Cones"
+	mmi.set_script(load("res://KnockableProps.gd"))
+	mmi.set("prop_transforms", xfs)
+	mmi.set("boxes", [[Vector3(0, 0.03, 0) * PROP_SCALE, Vector3(0.38, 0.06, 0.38) * PROP_SCALE],
+			[Vector3(0, 0.36, 0) * PROP_SCALE, Vector3(0.2, 0.62, 0.2) * PROP_SCALE]])
+	mmi.set("prop_mass", 6.0)
+	mmi.set("push_speed", 1.5)
+	mmi.set("release_radius", 3.2)
+	mmi.set("centre_of_mass_y", 0.06)
+	mmi.multimesh = mm
+	mmi.visibility_range_end = 500.0
+	root.add_child(mmi)
 
 
 ## The paddock north of the start straight: gazebos over tables, the team's vehicles.
@@ -227,6 +253,17 @@ func _build_paddock(root: Node3D) -> void:
 		camp.gazebo(kit, canopies[i], i % 2 == 0)
 		pk.set_frame(xf.translated_local(Vector3(0, 0, 0)).scaled_local(Vector3.ONE * PROP_SCALE))
 		camp.folding_table(kit, Color(0.92, 0.92, 0.90))
+		# The gazebo's four legs and the table (life size 1.84 x 0.74 x 0.76m), solid.
+		var gs: float = PROP_SCALE * 1.4
+		for lx in [-1.47, 1.47]:
+			for lz in [-1.47, 1.47]:
+				_box_shape(body, xf * Transform3D(Basis(), Vector3(lx, 1.03, lz) * gs), Vector3(0.12, 2.06, 0.12) * gs)
+		_box_shape(body, xf * Transform3D(Basis(), Vector3(0, 0.37, 0) * PROP_SCALE), Vector3(1.84, 0.74, 0.76) * PROP_SCALE)
+		if i % 2 == 0:
+			# The walled gazebo's back wall and its two side banners.
+			_box_shape(body, xf * Transform3D(Basis(), Vector3(0, 1.03, 1.5) * gs), Vector3(2.94, 2.06, 0.1) * gs)
+			for wx in [-1.49, 1.49]:
+				_box_shape(body, xf * Transform3D(Basis(), Vector3(wx, 0.45, 0) * gs), Vector3(0.1, 0.9, 2.94) * gs)
 		var vp: Dictionary = lap.spot(fin - 40.0 + float(i) * 26.0 + 2.0, -(lap.half + 40.0), 0.0)
 		var vpos: Vector3 = vp["pos"]
 		vpos.y = _ground_at(vpos.x, vpos.z)
@@ -346,8 +383,10 @@ func _sign(root: Node3D, sign_name: String, s: float, lat: float, words: String,
 	# `lat` is the board's inner edge.
 	var sp: Dictionary = lap.spot(s, lat + w * 0.5, 0.0)
 	var y: float = _ground_at((sp["pos"] as Vector3).x, (sp["pos"] as Vector3).z)
-	var n := Node3D.new()
+	# A body of its own: DressingColliders gives nothing on this level a collider ("track" is in its name).
+	var n := StaticBody3D.new()
 	n.name = "Sign_" + sign_name
+	n.set_meta(&"surface", "rock")
 	n.position = Vector3((sp["pos"] as Vector3).x, y, (sp["pos"] as Vector3).z)
 	# Facing back down the road, toward the cars coming.
 	n.rotation = Vector3(0.0, deg_to_rad(float(sp["yaw"])) + PI, 0.0)
@@ -378,6 +417,19 @@ func _sign(root: Node3D, sign_name: String, s: float, lat: float, words: String,
 		post.mesh = pm
 		post.position = Vector3(sx * (w * 0.5 - 0.5), 2.15, -0.1)
 		n.add_child(post)
+		var pc := CollisionShape3D.new()
+		var cyl := CylinderShape3D.new()
+		cyl.radius = 0.12
+		cyl.height = 4.3
+		pc.shape = cyl
+		pc.position = post.position
+		n.add_child(pc)
+	var bc := CollisionShape3D.new()
+	var bshape := BoxShape3D.new()
+	bshape.size = Vector3(w, 1.5, 0.2)
+	bc.shape = bshape
+	bc.position = Vector3(0, 3.3, 0)
+	n.add_child(bc)
 	for face in [1.0, -1.0]:
 		var lb := Label3D.new()
 		lb.text = words
