@@ -3452,6 +3452,36 @@ A clip that comes out quiet (the bubble car's at -37.7 dBFS) is raised in the fi
     the rears' on the hoop's rear brace. Found floating and fixed with `scratch/loose_parts.py`: the fuel tank (now
     strapped, brackets to the hoop's legs), the rudders' hinge posts (now reaching the exit ring), the skid plate (flush
     under the nose: it guards it on landings), the belly pan, the dash pod and the seat.
+- The Tuk-Tuk (`TuktukBuilder.gd`, in the Classics gallery, the user's pick for "a distinct one again"): a three-wheeled
+  auto-rickshaw. The Kugelblitz's keyed section (Meteor's shoulder, rim, wall, corner, top) through five regions: a tall
+  closed cowl over the front wheel (its bottom held at 0.37, clear of the tyre and mudguard, sweeping down behind it), the
+  cab's trough (floor 0.205, a low sill), the passengers' footwell (the side panels rising to 0.455 between z -0.06 and
+  0.05), a closed deck under the bench and the rear body behind it; arches lifted into the bottom over the rear wheels.
+  A canopy on pillars: an A-shaped windscreen (`build_glass` with the hood's little rear window, `_screen_pt`), a crowned
+  roof sampled densely round its rounded corners (`_roof_stations`, `_roof_edge`), a valance in the accent colour with
+  about 70 tassels hanging from it, curtains rolled up under the eaves, the hood (quarters on the rear body's shoulder,
+  a back panel round the window), alloy grab poles at the doorway. One round headlamp under a chrome visor and a chrome
+  "moustache", mirrors on the pillars, a marigold garland inside the windscreen, a spare wheel on the back with the plate
+  on its cover, louvres on the rear flanks. Factory paint: Two-Tone, "Tuk-Tuk Green" under a yellow canopy (the secondary
+  colour is the one above `belt_y` 0.64, so the cowl's top is yellow too), a red pinline and valance.
+  - One front wheel for the game's four corners: `build_wheel` puts the whole wheel in Wheel_FR and makes Wheel_FL an empty
+    mesh (one degenerate triangle corner to corner of the wheel's box, its vertices M_DARK so `mirror_wheel_face` leaves it
+    alone), both at the same hub: PlayerCart puts each pivot at its mesh's bounds' centre, so both steer and spin there.
+    An explosion that takes "FL" off takes nothing visible.
+  - Parts that steer: a builder's `STEERED_PARTS` ({name: [origin, rake, gain]}, each built by `build_steered(b, name)` in
+    the cart frame and moved into its own) become MeshInstance3Ds with `CarSteerFollower.gd`, which turns them about their
+    own y (tilted back by the rake) by Visuals/WheelPivotFR's angle times the gain (the Model frame is the Visuals': the two
+    half turns cancel). The fork with the mudguard turns with the wheel (gain 1, about the hub's vertical); the handlebars
+    on a column raked 0.42 rad, gain 0.55 (at 1 their ends reached the windscreen at full lock). In the menus, the garage
+    and a ghost there's no cart over them and they stand still. `res://scratch/steer_follow_probe.tscn -- [level=]
+    [cars=28,...] [seconds=60]` (headless) races bots and prints the front pivots' places and how far the parts strayed
+    from the wheels' turn; `scratch/car_preview.gd`'s `steer=` turns them too.
+  - Stats: the slowest top speed of the Classics (36) with the quickest acceleration (80) and the sharpest steering (4.0)
+    on little grip (4.3), weight 0.72 (the lightest). AI races (speed 3, no items): Lakeside laps about 98s against the
+    Kugelblitz's 94-106 and the Ninja's 85 (at 35 / 4.0 grip). Its engine loop is synthesised
+    (`scratch/synth_engine_tuktuk.py`: a single's exhaust thumps at 46 Hz, their strength and timing wandering from cycle to
+    cycle, a tinny ring from the pipe, now and then a metallic rattle, the crank's hum, all periodic in 2s, levelled to -18
+    dBFS); nobody has listened to it yet. `tools/elevenlabs/sfx.json`'s `engine_tuktuk` job can make a take to swap in.
 - `scratch/loose_parts.py` finds floating parts in any generated car body: `res://scratch/mesh_dump.gd` (`-s`, headless,
   `-- <mesh.res> <out.json>`) writes a mesh out, and the script (`<out.json> [cell=0.005] [step=0.003]`) samples every
   connected piece (each builder primitive is one) into 5mm cells and lists the groups of pieces not joined to the

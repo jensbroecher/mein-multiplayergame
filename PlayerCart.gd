@@ -504,6 +504,26 @@ const CAR_PRESETS = [
 		"offroad": 10.0,
 		"weight": 1.32,
 		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
+	},
+	{
+		"name": "Tuk-Tuk",
+		# A small single-cylinder engine putting along, synthesised (scratch/synth_engine_tuktuk.py: a seamless 2s loop,
+		# its rattle from the uneven firing and the tinny exhaust, rolled off so it is never shrill), levelled by its RMS
+		# (-18.0 dBFS). An ElevenLabs take (tools/elevenlabs/sfx.json, engine_tuktuk) can replace it.
+		"engine_sound": "res://sounds/enginesounds/engine_tuktuk_loop.wav",
+		"engine_gain_db": 8.3,
+		# Procedural (regenerate_cars.gd): paintable, wheels are separate meshes. Its one front wheel is Wheel_FR (Wheel_FL
+		# an empty mesh at the same hub); the fork and handlebars steer with it (CarSteerFollower.gd).
+		"model_path": "res://generated/cars/Tuk-Tuk.tscn",
+		"model_y_rotation": PI,
+		"max_speed": 36.0,
+		"acceleration": 80.0,
+		"steer_speed": 4.0,
+		"grip": 4.3,
+		"braking": 44.0,
+		"offroad": 5.5,
+		"weight": 0.72,
+		"wheel_parts": {"FL": "Wheel_FL", "FR": "Wheel_FR", "RL": "Wheel_RL", "RR": "Wheel_RR"}
 	}
 ]
 

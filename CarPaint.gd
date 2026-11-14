@@ -33,7 +33,7 @@ const PALETTE := [
 	["Shadow Violet", Color(0.46, 0.20, 0.82)], ["Surf Turquoise", Color(0.04, 0.58, 0.68)],
 	["Samurai Vermilion", Color(0.84, 0.19, 0.07)], ["Ninja Indigo", Color(0.09, 0.11, 0.24)],
 	["Crimson", Color(0.62, 0.04, 0.07)], ["Typhoon Yellow", Color(0.98, 0.70, 0.06)],
-	["Jukebox Pink", Color(0.97, 0.56, 0.64)],
+	["Jukebox Pink", Color(0.97, 0.56, 0.64)], ["Tuk-Tuk Green", Color(0.05, 0.42, 0.20)],
 ]
 const RIMS := [
 	["Silver", Color(0.76, 0.77, 0.79)], ["Titanium", Color(0.46, 0.47, 0.49)], ["Gunmetal", Color(0.22, 0.23, 0.25)],
@@ -128,6 +128,9 @@ const FACTORY := {
 	"Hexapod": {"pattern": 0, "finish": 0, "primary": Color(0.91, 0.90, 0.86),
 		"secondary": Color(0.10, 0.10, 0.11), "accent": Color(0.96, 0.44, 0.08),
 		"rim": Color(0.13, 0.13, 0.14), "number": 6},
+	"Tuk-Tuk": {"pattern": 2, "finish": 0, "primary": Color(0.05, 0.42, 0.20),
+		"secondary": Color(0.98, 0.80, 0.10), "accent": Color(0.80, 0.07, 0.05),
+		"rim": Color(0.76, 0.77, 0.79), "number": 3},
 }
 const FALLBACK := {"pattern": 0, "finish": 0, "primary": Color(0.80, 0.07, 0.05),
 	"secondary": Color(0.94, 0.94, 0.92), "accent": Color(0.98, 0.78, 0.07),

@@ -6,7 +6,7 @@ extends SceneTree
 #   Godot --path . --resolution 1400x900 -s res://scratch/car_preview.gd -- <out_dir> [car=Mudrunner]
 #       [orig=<imported car .tscn>] [scene=res://generated/cars/Mudrunner.tscn]
 #       [paint=<pattern>,<finish>,<primary>,<secondary>,<accent>,<rim>,<number>] [fov=40] [yaw=0]
-#       [sun=<pitch>,<yaw>] [antenna=1|2] name:x,y,z:tx,ty,tz[:ux,uy,uz] ...
+#       [sun=<pitch>,<yaw>] [antenna=1|2] [steer=<deg>] name:x,y,z:tx,ty,tz[:ux,uy,uz] ...
 # antenna=1 adds the race's antenna (PlayerCart.tscn) on the car's AntennaPlacement with its round tip, antenna=2 with
 # its flag (CarPaint.ANTENNAS), in the paint's accent colour.
 # orig renders an imported model instead, placed the way PlayerCart places it (x2, half turn);
@@ -105,6 +105,12 @@ func _init() -> void:
 			var w: Node3D = car.find_child("Wheel_" + corner, true, false)
 			if w:
 				w.rotation.y = deg_to_rad(steer_deg)
+		# Parts that steer with the wheels (CarSteerFollower.gd: the Tuk-Tuk's fork and handlebars), as a cart turns them.
+		for sp in car.find_children("*", "MeshInstance3D", true, false):
+			if sp.get_script() == preload("res://CarSteerFollower.gd"):
+				var a: float = clampf(deg_to_rad(steer_deg) * float(sp.get("gain")), -float(sp.get("limit")),
+						float(sp.get("limit")))
+				sp.transform.basis = sp.transform.basis * Basis(Vector3.UP, a)
 	var cam := Camera3D.new()
 	cam.fov = fov
 	cam.near = 0.02

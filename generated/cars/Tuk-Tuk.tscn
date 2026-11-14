@@ -1,0 +1,63 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://generated/cars/tuktuk_body.res" id="1_qpxb6"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/tuktuk_wheel_l.res" id="2_3ijfn"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/tuktuk_wheel_r.res" id="3_o28hf"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/tuktuk_rear_wheel_l.res" id="4_qv5m8"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/tuktuk_rear_wheel_r.res" id="5_ocdjo"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/tuktuk_glass.res" id="6_0xnrs"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/tuktuk_steer_Fork.res" id="7_wcbh6"]
+[ext_resource type="Script" path="res://CarSteerFollower.gd" id="8_o3o7h"]
+[ext_resource type="ArrayMesh" path="res://generated/cars/tuktuk_steer_Handlebar.res" id="9_jk3gd"]
+
+[node name="Tuk-Tuk" type="Node3D" unique_id=333991899]
+metadata/procedural_car = true
+
+[node name="Model" type="Node3D" parent="." unique_id=523167112]
+transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 0, 0, 0)
+
+[node name="Body" type="MeshInstance3D" parent="Model" unique_id=204358924]
+mesh = ExtResource("1_qpxb6")
+metadata/car_shader = true
+
+[node name="Wheel_FL" type="MeshInstance3D" parent="Model" unique_id=1807348560]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.155, -0.7)
+mesh = ExtResource("2_3ijfn")
+metadata/car_shader = true
+
+[node name="Wheel_FR" type="MeshInstance3D" parent="Model" unique_id=1301999887]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.155, -0.7)
+mesh = ExtResource("3_o28hf")
+metadata/car_shader = true
+
+[node name="Wheel_RL" type="MeshInstance3D" parent="Model" unique_id=864297481]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.345, 0.155, 0.5)
+mesh = ExtResource("4_qv5m8")
+metadata/car_shader = true
+
+[node name="Wheel_RR" type="MeshInstance3D" parent="Model" unique_id=1149082341]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.345, 0.155, 0.5)
+mesh = ExtResource("5_ocdjo")
+metadata/car_shader = true
+
+[node name="Glass" type="MeshInstance3D" parent="Model" unique_id=317568908]
+cast_shadow = 0
+mesh = ExtResource("6_0xnrs")
+metadata/car_shader = true
+metadata/car_glass = true
+
+[node name="Fork" type="MeshInstance3D" parent="Model" unique_id=1095061803]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.155, -0.7)
+mesh = ExtResource("7_wcbh6")
+script = ExtResource("8_o3o7h")
+metadata/car_shader = true
+
+[node name="Handlebar" type="MeshInstance3D" parent="Model" unique_id=471515888]
+transform = Transform3D(1, 0, 0, 0, 0.9130889, -0.40776044, 0, 0.40776044, 0.9130889, 0, 0.716, -0.458)
+mesh = ExtResource("9_jk3gd")
+script = ExtResource("8_o3o7h")
+gain = 0.55
+metadata/car_shader = true
+
+[node name="AntennaPlacement" type="Node3D" parent="Model" unique_id=1626465369]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 1.075, 0.74)

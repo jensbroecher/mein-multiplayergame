@@ -776,6 +776,14 @@
   "influence": 0.6
  },
  {
+  "name": "engine_tuktuk",
+  "path": "sounds/enginesounds/engine_tuktuk_elevenlabs_loop.wav",
+  "text": "An auto-rickshaw tuk-tuk: a small single-cylinder engine putting along at a steady medium speed, a rhythmic rattly putt-putt-putt through a tinny little exhaust, the thin metal body panels rattling faintly with it, recorded close, warm and not shrill, constant engine speed, no revving, no horn, no traffic, continuous",
+  "duration": 8.0,
+  "loop": true,
+  "influence": 0.6
+ },
+ {
   "name": "hq_door_open",
   "path": "sounds/garage/sliding_door_open.wav",
   "text": "Automatic sliding glass doors of a modern office lobby opening: a soft electric motor whirr and a smooth rubber-wheeled glide along an overhead track, ending in a gentle soft stop, recorded close, clean, no voices, no beeps",

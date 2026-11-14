@@ -43,6 +43,7 @@ const CARS := [
 	{"name": "Typhoon", "prefix": "typhoon", "builder": preload("res://TyphoonBuilder.gd")},
 	{"name": "Jukebox", "prefix": "jukebox", "builder": preload("res://JukeboxBuilder.gd")},
 	{"name": "Hexapod", "prefix": "hexapod", "builder": preload("res://HexapodBuilder.gd")},
+	{"name": "Tuk-Tuk", "prefix": "tuktuk", "builder": preload("res://TuktukBuilder.gd")},
 ]
 
 
@@ -97,6 +98,14 @@ static func build_car(builder_script: Script) -> Dictionary:
 		design.build_prop(pb)
 		out["prop"] = pb.commit(mat)
 		out["triangles"] += pb.triangle_count()
+	# Parts that steer with the front wheels (the Tuk-Tuk's fork and handlebars): STEERED_PARTS {name: [position, rake,
+	# gain]}, each built by build_steered(b, name) about its own origin, its y the steering axis (tilted back by rake).
+	if "STEERED_PARTS" in design:
+		for part in design.STEERED_PARTS:
+			var sb := CB.new()
+			design.build_steered(sb, part)
+			out["steer_" + String(part)] = sb.commit(mat)
+			out["triangles"] += sb.triangle_count()
 	if design.has_method("build_glass"):
 		var gb := CB.new()
 		design.build_glass(gb)
@@ -158,6 +167,17 @@ static func assemble(car_name: String, parts: Dictionary) -> Node3D:
 		glass.set_meta("car_shader", true)
 		glass.set_meta("car_glass", true)
 		model.add_child(glass)
+	if "STEERED_PARTS" in design:
+		for part in design.STEERED_PARTS:
+			var entry: Array = design.STEERED_PARTS[part]
+			var sp := MeshInstance3D.new()
+			sp.name = String(part)
+			sp.mesh = parts["steer_" + String(part)]
+			sp.transform = Transform3D(Basis(Vector3.RIGHT, entry[1]), entry[0])
+			sp.set_script(load("res://CarSteerFollower.gd"))
+			sp.set("gain", entry[2])
+			sp.set_meta("car_shader", true)
+			model.add_child(sp)
 	if parts.has("prop"):
 		var prop := MeshInstance3D.new()
 		prop.name = "Prop"
@@ -206,7 +226,11 @@ func _ready() -> void:
 		var mat: ShaderMaterial = parts["material"]
 		mat.set_shader_parameter("detail_map", tex)
 		mat = _save(mat, prefix + "_material.tres")
-		for key in ["body", "wheel_l", "wheel_r", "rear_wheel_l", "rear_wheel_r", "prop"]:
+		var keys: Array = ["body", "wheel_l", "wheel_r", "rear_wheel_l", "rear_wheel_r", "prop"]
+		for key in parts:
+			if String(key).begins_with("steer_"):
+				keys.append(key)
+		for key in keys:
 			if not parts.has(key):
 				continue
 			var mesh: ArrayMesh = parts[key]
