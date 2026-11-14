@@ -2066,16 +2066,113 @@ static func park_bench(pk: PropKit, kit: Dictionary) -> void:
 		_bar(pk, kit, "hinoki", Vector3(-0.9, 0.6 + 0.17 * float(k), -0.24), Vector3(0.9, 0.6 + 0.17 * float(k), -0.24), 0.1, 0.04, wood, Vector3.UP)
 
 
-## A garden boulder, centred, `r` across and `h` high above the ground (its foot 0.3 into it): a lumpy granite stone
-## turned from a ragged profile, a mossy band low down.
+## A garden boulder, centred, `r` across its half and `h` high above the ground (its foot 0.3 into it): an icosphere pulled out
+## into a squat, uneven stone by noise, split by two or three flat fracture faces, its top a little flattened, in
+## garden_stone.gdshader (key "boulder": grey granite, moss on its top and round its foot; occlusion and the height over
+## the ground in its vertex colours). It had been a seven-sided lathe in one flat grey.
 static func garden_rock(pk: PropKit, kit: Dictionary, r := 0.8, h := 0.6, seed_v := 1) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_v
-	var rot := Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(1.0, 1.0, rng.randf_range(0.6, 0.9)))
-	var col: Color = STONE_A.lerp(STONE_B, rng.randf()).darkened(rng.randf() * 0.15)
-	_turn(pk, kit, "matte", Vector3(0, -0.3, 0), [Vector2(0.0, 0.0), Vector2(r * 0.9, 0.02), Vector2(r * rng.randf_range(0.9, 1.05), 0.3 + h * 0.25),
-			Vector2(r * rng.randf_range(0.7, 0.85), 0.3 + h * 0.7), Vector2(r * rng.randf_range(0.3, 0.45), 0.3 + h * 0.97), Vector2(0.0, 0.3 + h)], 7, col, true, rng.randf() * TAU, rot)
-	_turn(pk, kit, "leaf", Vector3(0, -0.02, 0), [Vector2(r * 0.97, 0.0), Vector2(r * 0.99, 0.08), Vector2(r * 0.9, 0.12)], 7, MOSS.darkened(0.2), true, 0.0, rot)
+	var noise := FastNoiseLite.new()
+	noise.seed = seed_v
+	noise.frequency = 1.1
+	noise.fractal_octaves = 3
+	var fine := FastNoiseLite.new()
+	fine.seed = seed_v + 77
+	fine.frequency = 3.4
+	fine.fractal_octaves = 2
+	var sub: int = 3 if r > 0.55 else 2
+	var ico: Array = _icosphere(sub)
+	var verts: PackedVector3Array = ico[0]
+	var faces: PackedInt32Array = ico[1]
+	var yaw: float = rng.randf() * TAU
+	var aspect: float = rng.randf_range(0.65, 0.92)
+	var rot := Basis(Vector3.UP, yaw)
+	var half := Vector3(r, (h + 0.3) * 0.5, r * aspect)
+	var cy: float = -0.3 + half.y
+	# Fracture faces: planes cutting the round shape flat (not the underside).
+	var cuts: Array = []
+	for k in rng.randi_range(2, 3):
+		var cn := Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-0.1, 0.9), rng.randf_range(-1.0, 1.0)).normalized()
+		cuts.append([cn, rng.randf_range(0.7, 0.85)])
+	var pos := PackedVector3Array()
+	var seed_f: float = fposmod(float(seed_v) * 0.618, 1.0)
+	for v in verts:
+		var u: Vector3 = v
+		var f: float = 1.0 + 0.16 * noise.get_noise_3dv(u * 1.3) + 0.05 * fine.get_noise_3dv(u * 2.0)
+		u *= f
+		for c in cuts:
+			var cn: Vector3 = c[0]
+			var over: float = u.dot(cn) - float(c[1])
+			if over > 0.0:
+				u -= cn * over * 0.9
+		# A flatter top and a broad foot.
+		if u.y > 0.62:
+			u.y = 0.62 + (u.y - 0.62) * 0.45
+		if u.y < -0.3:
+			u.x *= 1.0 + (-0.3 - u.y) * 0.3
+			u.z *= 1.0 + (-0.3 - u.y) * 0.3
+		pos.append(rot * Vector3(u.x * half.x, u.y * half.y + cy, u.z * half.z))
+	# Smooth normals from the faces round each vertex.
+	var nrm := PackedVector3Array()
+	nrm.resize(pos.size())
+	for i in range(0, faces.size(), 3):
+		var a: Vector3 = pos[faces[i]]
+		var b2: Vector3 = pos[faces[i + 1]]
+		var c2: Vector3 = pos[faces[i + 2]]
+		var fn: Vector3 = (b2 - a).cross(c2 - a)
+		for j in 3:
+			nrm[faces[i + j]] += fn
+	var cols: Array = []
+	for i in pos.size():
+		var n: Vector3 = nrm[i]
+		if n.dot(pos[i] - Vector3(0, cy, 0)) < 0.0:
+			n = -n
+		nrm[i] = n.normalized()
+		var y: float = pos[i].y
+		var occ: float = clampf(0.55 + 0.45 * smoothstep(-0.05, h * 0.5, y) + 0.25 * noise.get_noise_3dv(verts[i] * 1.3), 0.35, 1.0)
+		cols.append(Color(occ, clampf(maxf(y, 0.0) / 1.5, 0.0, 1.0), seed_f, 1.0))
+	for i in range(0, faces.size(), 3):
+		var ia: int = faces[i]
+		var ib: int = faces[i + 1]
+		var ic: int = faces[i + 2]
+		var mid: Vector3 = (pos[ia] + pos[ib] + pos[ic]) / 3.0
+		if mid.y < -0.32:
+			continue
+		var out: Vector3 = (nrm[ia] + nrm[ib] + nrm[ic]).normalized()
+		pk.tri_c(kit, "boulder", pos[ia], pos[ib], pos[ic], nrm[ia], nrm[ib], nrm[ic], cols[ia], cols[ib], cols[ic], out)
+
+
+## A unit icosphere subdivided `sub` times: [vertices, triangle indices].
+static func _icosphere(sub: int) -> Array:
+	var t: float = (1.0 + sqrt(5.0)) * 0.5
+	var verts: Array = []
+	for p in [Vector3(-1, t, 0), Vector3(1, t, 0), Vector3(-1, -t, 0), Vector3(1, -t, 0), Vector3(0, -1, t), Vector3(0, 1, t),
+			Vector3(0, -1, -t), Vector3(0, 1, -t), Vector3(t, 0, -1), Vector3(t, 0, 1), Vector3(-t, 0, -1), Vector3(-t, 0, 1)]:
+		verts.append((p as Vector3).normalized())
+	var faces: Array = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+			[3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]]
+	for s in sub:
+		var cache := {}
+		var nf: Array = []
+		var mid := func(i: int, j: int) -> int:
+			var key: int = mini(i, j) * 100000 + maxi(i, j)
+			if cache.has(key):
+				return cache[key]
+			verts.append(((verts[i] as Vector3) + (verts[j] as Vector3)).normalized())
+			cache[key] = verts.size() - 1
+			return verts.size() - 1
+		for f in faces:
+			var a: int = mid.call(f[0], f[1])
+			var b: int = mid.call(f[1], f[2])
+			var c: int = mid.call(f[2], f[0])
+			nf.append_array([[f[0], a, c], [f[1], b, a], [f[2], c, b], [a, b, c]])
+		faces = nf
+	var pv := PackedVector3Array(verts)
+	var fi := PackedInt32Array()
+	for f in faces:
+		fi.append_array(PackedInt32Array(f))
+	return [pv, fi]
 
 
 ## A festival pole, centred, `h` tall: a bamboo culm with its nodes on a squared stone block, a short crosspiece at the

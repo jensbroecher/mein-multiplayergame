@@ -92,6 +92,10 @@ func _build_set(which: String, seed_v: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_v
 	match which:
+		"rocks":
+			for k in 6:
+				var rr: float = [0.5, 0.7, 0.9, 1.2, 0.6, 1.5][k]
+				_add("garden_rock_%d" % k, rr * 2.6 + 1.0, func(pk, kit, labels): K.garden_rock(pk, kit, rr, rr * 0.65, k * 13 + 5))
 		"koi":
 			_add("koinobori_pole", 16.0, func(pk, kit, labels): K.koinobori_pole(pk, kit, 9.0, 2, Vector3(0, 0, 1), rng))
 			_add("koinobori_line", 30.0, func(pk, kit, labels): K.koinobori_line(pk, kit, Vector3(-8, 0, -2), Vector3(8, 0, -2), 7, Vector3(0, 0, 1), 1.3, rng, 8.0))

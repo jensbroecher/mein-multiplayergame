@@ -1534,10 +1534,11 @@ func _build_roads(root: Node3D) -> void:
 			if lifted > 0.0:
 				print("  %s %.0f-%.0f: the paving lifted over the ground by up to %.2fm" % [r.name, s0, s1, lifted])
 			_road_faces[surface] = faces
-	# Decks have sides and an underside (a ribbon alone is a sheet of paper from beside a bridge).
+	# Decks have sides and an underside (a ribbon alone is a sheet of paper from beside a bridge). Not a span that carries
+	# its own deck (fifth field true: Yoshino Rapids' rafts), where the fascia stood up over the bank as a brown wedge.
 	for b in bridges:
 		var br: Route = _route_by_name.get(String(b[0]))
-		if br != null:
+		if br != null and not (b.size() > 4 and bool(b[4])):
 			_build_deck_slab(node, br, float(b[1]), float(b[2]), piece)
 			piece += 1
 	print("  roads: %d pieces" % piece)

@@ -184,48 +184,102 @@ static func _pipe(pk: PropKit, kit: Dictionary, key: String, c: Array, radii, si
 			pk.tri(kit, key, p, p + (rings[i][k] as Vector3) * r, p + (rings[i][k1] as Vector3) * r, d, d, d, col.darkened(0.15), d)
 
 
-## The cut face of a log at `c` (the log's axis `axis`, the face looking along axis * sgn), in bands of plain colour:
-## bark, pale sapwood with a growth ring, the red heartwood, the pith. `detail` 0: peeled (no bark ring), sapwood and heart;
-## 1: bark, sapwood, heart; 2: with a growth ring and the pith too.
-static func _cut(pk: PropKit, kit: Dictionary, c: Vector3, axis: Vector3, sgn: float, r: float, sides: int, detail := 1, ref := Vector3.UP) -> void:
+## The cut face of a log at `c` (the log's axis `axis`, the face looking along axis * sgn): one fan in log_wood.gdshader
+## (key "log"), which draws the growth rings, sapwood and heartwood, checks, saw marks and (on a barked log, `detail` 1 or
+## more) the bark's rim from the face's own coordinates. `outline` (optional) is the log's section there as radii for
+## `sides` angles, so the end matches an uneven log; `seed` (0..1) its draw, `shade` how much darker.
+static func _cut(pk: PropKit, kit: Dictionary, c: Vector3, axis: Vector3, sgn: float, r: float, sides: int, detail := 1, ref := Vector3.UP,
+		seed_v := -1.0, shade := 0.0, outline: Array = []) -> void:
 	var ax: Array = _ring_axes(axis, ref)
-	var bands: Array
-	match detail:
-		0:
-			bands = [[1.0, 0.58, SAPWOOD.darkened(0.06)], [0.58, 0.0, HEARTWOOD]]
-		1:
-			bands = [[1.0, 0.9, BARK_DARK], [0.9, 0.55, SAPWOOD], [0.55, 0.0, HEARTWOOD]]
-		_:
-			bands = [[1.0, 0.91, BARK_DARK], [0.91, 0.74, SAPWOOD], [0.74, 0.56, SAPWOOD_RING], [0.56, 0.14, HEARTWOOD], [0.14, 0.0, PITH]]
 	var n: Vector3 = axis * sgn
-	for band in bands:
-		var ro: float = r * float(band[0])
-		var ri: float = r * float(band[1])
-		var col: Color = band[2]
-		for k in sides:
-			var a0: float = TAU * float(k) / float(sides)
-			var a1: float = TAU * float(k + 1) / float(sides)
-			var d0: Vector3 = (ax[0] as Vector3) * cos(a0) + (ax[1] as Vector3) * sin(a0)
-			var d1: Vector3 = (ax[0] as Vector3) * cos(a1) + (ax[1] as Vector3) * sin(a1)
-			if ri > 1e-5:
-				pk.tri(kit, "wood", c + d0 * ro, c + d1 * ro, c + d1 * ri, n, n, n, col, n)
-				pk.tri(kit, "wood", c + d0 * ro, c + d1 * ri, c + d0 * ri, n, n, n, col, n)
-			else:
-				pk.tri(kit, "wood", c + d0 * ro, c + d1 * ro, c, n, n, n, col, n)
+	if seed_v < 0.0:
+		seed_v = _seed_of(c)
+	var data := Color(clampf(r / 0.5, 0.0, 1.0), seed_v, shade, 1.0 if detail >= 1 else 0.7)
+	for k in sides:
+		var k1: int = (k + 1) % sides
+		var a0: float = TAU * float(k) / float(sides)
+		var a1: float = TAU * float(k + 1) / float(sides)
+		var r0: float = float(outline[k]) if outline.size() == sides else r
+		var r1: float = float(outline[k1]) if outline.size() == sides else r
+		var d0: Vector3 = (ax[0] as Vector3) * cos(a0) + (ax[1] as Vector3) * sin(a0)
+		var d1: Vector3 = (ax[0] as Vector3) * cos(a1) + (ax[1] as Vector3) * sin(a1)
+		pk.tri(kit, "log", c, c + d0 * r0, c + d1 * r1, n, n, n, data, n,
+				Vector2.ZERO, Vector2(cos(a0), sin(a0)) * r0 / r, Vector2(cos(a1), sin(a1)) * r1 / r)
 
 
-## A round log from a to b (radius ra to rb): bark (`bark`, furrowed in two tones) or peeled wood round it, cut faces at the
-## ends named in `ends` (1: a, 2: b). `shade` darkens it (0..1).
+## A seed (0..1) from a place, so each log draws its own rings, checks and knots.
+static func _seed_of(p: Vector3) -> float:
+	return fposmod(sin(p.x * 12.9898 + p.y * 78.233 + p.z * 37.719) * 43758.5453, 1.0)
+
+
+## A length of round timber along the polyline `c` (radius `r`, or one per point) in log_wood.gdshader (key "log"):
+## bark, or peeled wood when `peeled`. Its section may be uneven: `outline` radii (as fractions of the radius) for
+## `sides` angles round it, the same all along. No end faces (see _cut).
+static func _log_pipe(pk: PropKit, kit: Dictionary, c: Array, radii, sides: int, peeled: bool, seed_v: float, shade := 0.0,
+		ref := Vector3.UP, outline: Array = []) -> void:
+	var n := c.size()
+	if n < 2:
+		return
+	var part: float = 0.35 if peeled else 0.0
+	var v0 := 0.0
+	var prev: Array = []
+	for i in n:
+		var d: Vector3 = ((c[mini(i + 1, n - 1)] as Vector3) - (c[maxi(i - 1, 0)] as Vector3)).normalized()
+		var ax: Array = _ring_axes(d, ref)
+		var rr: float = float(radii[i]) if radii is Array else float(radii)
+		if i > 0:
+			v0 += (c[i] as Vector3).distance_to(c[i - 1])
+		var ring: Array = []
+		for k in sides + 1:
+			var a: float = TAU * float(k) / float(sides)
+			var f: float = float(outline[k % sides]) if outline.size() == sides else 1.0
+			var dir: Vector3 = (ax[0] as Vector3) * cos(a) + (ax[1] as Vector3) * sin(a)
+			ring.append([(c[i] as Vector3) + dir * rr * f, dir, Vector2(float(k) / float(sides), v0), Color(clampf(rr / 0.5, 0.0, 1.0), seed_v, shade, part)])
+		if i > 0:
+			for k in sides:
+				var p00: Array = prev[k]
+				var p01: Array = prev[k + 1]
+				var p10: Array = ring[k]
+				var p11: Array = ring[k + 1]
+				var out: Vector3 = ((p00[1] as Vector3) + (p11[1] as Vector3)).normalized()
+				pk.tri_c(kit, "log", p00[0], p01[0], p11[0], p00[1], p01[1], p11[1], p00[3], p01[3], p11[3], out, p00[2], p01[2], p11[2])
+				pk.tri_c(kit, "log", p00[0], p11[0], p10[0], p00[1], p11[1], p10[1], p00[3], p11[3], p10[3], out, p00[2], p11[2], p10[2])
+		prev = ring
+
+
+## A round log from a to b (radius ra to rb), in log_wood.gdshader: bark (`bark`) or peeled cedar round it, an uneven
+## section (a little oval, lumpy), a slight bow along it, and cut faces at the ends named in `ends` (1: a, 2: b) with the
+## same outline. `shade` darkens it (0..1). `sides` is doubled (at least 10): eight flat faces read as a pencil.
 static func _log(pk: PropKit, kit: Dictionary, a: Vector3, b: Vector3, ra: float, rb: float, sides := 8, bark := true, ends := 3, shade := 0.0, detail := 1, ref := Vector3.UP) -> void:
-	var col: Color = (BARK if bark else PEELED).darkened(shade)
-	var col2: Color = (BARK_DARK if bark else PEELED.darkened(0.12)).darkened(shade)
-	_pipe(pk, kit, "hinoki", [a, b], [ra, rb], sides, col, 0, ref, col2)
+	var sd: int = maxi(10, sides * 2)
+	var seed_v: float = _seed_of(a + b * 0.37)
+	var outline: Array = []
+	var ph: float = seed_v * TAU
+	for k in sd:
+		var t: float = TAU * float(k) / float(sd)
+		outline.append(1.0 + 0.045 * cos(2.0 * t + ph) + 0.02 * sin(3.0 * t + ph * 2.3) + 0.012 * sin(5.0 * t + ph * 4.1))
+	var length: float = a.distance_to(b)
 	var d := (b - a).normalized()
+	var bow_dir: Vector3 = (_ring_axes(d, ref)[0] as Vector3) * cos(ph * 1.7) + (_ring_axes(d, ref)[1] as Vector3) * sin(ph * 1.7)
+	var bow: float = length * 0.006 * (0.4 + seed_v)
+	var segs: int = clampi(int(ceil(length / 1.0)), 2, 8)
+	var line: Array = []
+	var radii: Array = []
+	for i in segs + 1:
+		var t: float = float(i) / float(segs)
+		line.append(a.lerp(b, t) + bow_dir * bow * sin(PI * t))
+		radii.append(lerpf(ra, rb, t) * (1.0 + 0.025 * sin(t * 9.0 + ph)))
+	_log_pipe(pk, kit, line, radii, sd, not bark, seed_v, shade, ref, outline)
 	var dt: int = detail if bark else 0
+	var oa: Array = []
+	var ob: Array = []
+	for f in outline:
+		oa.append(float(f) * float(radii[0]))
+		ob.append(float(f) * float(radii[segs]))
 	if ends & 1:
-		_cut(pk, kit, a, d, -1.0, ra, sides, dt, ref)
+		_cut(pk, kit, line[0], ((line[1] as Vector3) - (line[0] as Vector3)).normalized(), -1.0, float(radii[0]), sd, maxi(dt, 1) if bark else 0, ref, seed_v, shade, oa)
 	if ends & 2:
-		_cut(pk, kit, b, d, 1.0, rb, sides, dt, ref)
+		_cut(pk, kit, line[segs], ((line[segs] as Vector3) - (line[segs - 1] as Vector3)).normalized(), 1.0, float(radii[segs]), sd, maxi(dt, 1) if bark else 0, ref, fposmod(seed_v * 7.3, 1.0), shade, ob)
 
 
 ## A few turns of rope round a member at `c` along `axis` (an open sleeve).
@@ -521,6 +575,9 @@ static func plank_stack(pk: PropKit, kit: Dictionary, w := 1.2, h := 1.4, length
 const MILL_WHEEL_R := 2.4
 const MILL_WHEEL_W := 1.1
 const MILL_AXLE := Vector3(1.3, 2.75, -5.15)
+## The wheel's buckets: how many, and how far (radians) each one's elbow bends back from its start to the rim.
+const WHEEL_BUCKETS := 16
+const WHEEL_BUCKET_BACK := 0.24
 
 
 ## The wheel's axle (its middle) in the sawmill's frame: put water_wheel()'s mesh here and turn it about x.
@@ -549,7 +606,7 @@ static func water_wheel(pk: PropKit, kit: Dictionary, r := 2.4, w := 1.1) -> voi
 	_pipe(pk, kit, "hinoki", [Vector3(-hx + 0.04, 0, 0), Vector3(hx - 0.04, 0, 0)], 0.27, 8, wet, 3)
 	for sx in [-1.0, 1.0]:
 		var x: float = sx * (hx - 0.03)
-		pk.lathe(kit, "wood", Vector3(x, 0, 0), [Vector2(r - 0.44, -0.03), Vector2(r, -0.03), Vector2(r, 0.03), Vector2(r - 0.44, 0.03), Vector2(r - 0.44, -0.03)], 16, wet.lightened(0.06), false, ab)
+		_shroud(pk, kit, x, r, 0.44, 0.06, wet.lightened(0.06))
 		for k in 8:
 			var a: float = TAU * float(k) / 8.0 + (0.0 if sx < 0.0 else 0.0)
 			var d := Vector3(0, cos(a), sin(a))
@@ -559,13 +616,68 @@ static func water_wheel(pk: PropKit, kit: Dictionary, r := 2.4, w := 1.1) -> voi
 	# The sole (the buckets' floor), seen from outside and from inside.
 	pk.lathe(kit, "wood", Vector3.ZERO, [Vector2(r - 0.40, -hx + 0.06), Vector2(r - 0.40, hx - 0.06)], 16, wet, false, ab)
 	pk.lathe(kit, "wood", Vector3.ZERO, [Vector2(r - 0.43, hx - 0.06), Vector2(r - 0.43, -hx + 0.06)], 16, wet.darkened(0.25), false, ab)
-	for k in 16:
-		var a0: float = TAU * float(k) / 16.0
-		var a1: float = a0 + 0.2
+	# The buckets: each a board standing out from the sole (the start) and one bent back against the turn to the rim (the
+	# elbow), so on the loaded side (the top runs toward +z) each one is a cup that holds its water until near the bottom.
+	# (They had leaned the other way, with the turn, and would have spilled as they filled.)
+	for k in WHEEL_BUCKETS:
+		var a0: float = TAU * float(k) / float(WHEEL_BUCKETS)
+		var a1: float = a0 - WHEEL_BUCKET_BACK
 		var p0 := Vector3(0, cos(a0), sin(a0)) * (r - 0.41)
+		var pe := Vector3(0, cos(a0), sin(a0)) * (r - 0.21)
 		var p1 := Vector3(0, cos(a1), sin(a1)) * (r - 0.01)
-		var n := (p1 - p0).cross(Vector3.RIGHT).normalized()
-		pk.panel(kit, "wood", [p0 + Vector3(-hx + 0.06, 0, 0), p0 + Vector3(hx - 0.06, 0, 0), p1 + Vector3(hx - 0.06, 0, 0), p1 + Vector3(-hx + 0.06, 0, 0)], n, wet.lightened(0.04), wet.darkened(0.1))
+		for seg in [[p0, pe], [pe, p1]]:
+			var sa: Vector3 = seg[0]
+			var sb: Vector3 = seg[1]
+			var n := (sb - sa).cross(Vector3.RIGHT).normalized()
+			pk.panel(kit, "wood", [sa + Vector3(-hx + 0.06, 0, 0), sa + Vector3(hx - 0.06, 0, 0), sb + Vector3(hx - 0.06, 0, 0), sb + Vector3(-hx + 0.06, 0, 0)], n, wet.lightened(0.04), wet.darkened(0.1))
+
+
+## One shroud of the wheel at x (its middle), `t` thick: sixteen curved felloe boards from r - `depth` to r, each a little
+## apart from the next (a dark joint), drawn in the cypress's grain (UVs in metres along the board), two iron bolts over
+## each joint. It had been one flat-coloured sixteen-sided ring.
+static func _shroud(pk: PropKit, kit: Dictionary, x: float, r: float, depth: float, t: float, col: Color) -> void:
+	var n := WHEEL_BUCKETS
+	var sub := 4
+	var gap := 0.004
+	var ri: float = r - depth
+	for k in n:
+		var a0: float = TAU * float(k) / float(n) + gap
+		var a1: float = TAU * float(k + 1) / float(n) - gap
+		var tone: Color = col.darkened(0.06 * float(k % 3)).lightened(0.04 * float((k * 7) % 2))
+		for j in sub:
+			var b0: float = lerpf(a0, a1, float(j) / float(sub))
+			var b1: float = lerpf(a0, a1, float(j + 1) / float(sub))
+			var d0 := Vector3(0, cos(b0), sin(b0))
+			var d1 := Vector3(0, cos(b1), sin(b1))
+			var u0: float = (b0 - a0) * r
+			var u1: float = (b1 - a0) * r
+			for sx in [-1.0, 1.0]:
+				var fx: float = x + sx * t * 0.5
+				var nn := Vector3(sx, 0, 0)
+				pk.tri(kit, "hinoki", Vector3(fx, 0, 0) + d0 * ri, Vector3(fx, 0, 0) + d0 * r, Vector3(fx, 0, 0) + d1 * r, nn, nn, nn, tone, nn,
+						Vector2(u0, 0.0) * uvk, Vector2(u0, depth) * uvk, Vector2(u1, depth) * uvk)
+				pk.tri(kit, "hinoki", Vector3(fx, 0, 0) + d0 * ri, Vector3(fx, 0, 0) + d1 * r, Vector3(fx, 0, 0) + d1 * ri, nn, nn, nn, tone, nn,
+						Vector2(u0, 0.0) * uvk, Vector2(u1, depth) * uvk, Vector2(u1, 0.0) * uvk)
+			# The rim's outer edge and the inner edge.
+			for e in [[r, 1.0], [ri, -1.0]]:
+				var rr: float = e[0]
+				var o0: Vector3 = d0 * float(e[1])
+				var o1: Vector3 = d1 * float(e[1])
+				pk.tri(kit, "hinoki", Vector3(x - t * 0.5, 0, 0) + d0 * rr, Vector3(x + t * 0.5, 0, 0) + d0 * rr, Vector3(x + t * 0.5, 0, 0) + d1 * rr, o0, o0, o1, tone.darkened(0.1), (o0 + o1).normalized(),
+						Vector2(u0, 0.0) * uvk, Vector2(u0, t) * uvk, Vector2(u1, t) * uvk)
+				pk.tri(kit, "hinoki", Vector3(x - t * 0.5, 0, 0) + d0 * rr, Vector3(x + t * 0.5, 0, 0) + d1 * rr, Vector3(x - t * 0.5, 0, 0) + d1 * rr, o0, o1, o1, tone.darkened(0.1), (o0 + o1).normalized(),
+						Vector2(u0, 0.0) * uvk, Vector2(u1, t) * uvk, Vector2(u1, 0.0) * uvk)
+		# The board's ends, facing along the ring (the joint).
+		for e2 in [[a0, -1.0], [a1, 1.0]]:
+			var dd := Vector3(0, cos(float(e2[0])), sin(float(e2[0])))
+			var tn := Vector3(0, -sin(float(e2[0])), cos(float(e2[0]))) * float(e2[1])
+			pk.quad(kit, "wood", [Vector3(x - t * 0.5, 0, 0) + dd * ri, Vector3(x + t * 0.5, 0, 0) + dd * ri, Vector3(x + t * 0.5, 0, 0) + dd * r, Vector3(x - t * 0.5, 0, 0) + dd * r], tn, col.darkened(0.35))
+		# Two bolt heads over the joint at the board's start, on the outer face.
+		var ja := TAU * float(k) / float(n)
+		var jd := Vector3(0, cos(ja), sin(ja))
+		var outx: float = x + signf(x) * (t * 0.5 + 0.008)
+		for rb in [ri + depth * 0.28, ri + depth * 0.72]:
+			_box(pk, kit, "metal", Vector3(outx, 0, 0) + jd * rb, Basis(Vector3.RIGHT, ja), Vector3(0.016, 0.045, 0.045), IRON)
 
 
 ## A water-powered sawmill: front z = 0 facing +z, x 0..16, 9 deep. An open-sided timber shed under a cedar-bark roof (x 2.3 to
@@ -1478,9 +1590,10 @@ static func ledge_walk(pk: PropKit, kit: Dictionary, pts: PackedVector3Array, ri
 			var s1: Vector3 = at.call(i + 1, v, -0.235)
 			var e := (s1 - s0).normalized() * 0.03
 			_bar(pk, kit, "hinoki", s0 - e, s1 + e, 0.26, 0.21, AGED, rv, false)
-	_pipe(pk, kit, "hinoki", kerb, 0.185, 6, BARK.lightened(0.1), 0, Vector3.UP, BARK_DARK.lightened(0.08))
-	_cut(pk, kit, kerb[0], ((kerb[1] as Vector3) - (kerb[0] as Vector3)).normalized(), -1.0, 0.185, 6, 1)
-	_cut(pk, kit, kerb[n - 1], ((kerb[n - 1] as Vector3) - (kerb[n - 2] as Vector3)).normalized(), 1.0, 0.185, 6, 1)
+	var ks: float = _seed_of(kerb[0])
+	_log_pipe(pk, kit, kerb, 0.185, 12, false, ks, 0.0)
+	_cut(pk, kit, kerb[0], ((kerb[1] as Vector3) - (kerb[0] as Vector3)).normalized(), -1.0, 0.185, 12, 1, Vector3.UP, ks)
+	_cut(pk, kit, kerb[n - 1], ((kerb[n - 1] as Vector3) - (kerb[n - 2] as Vector3)).normalized(), 1.0, 0.185, 12, 1, Vector3.UP, fposmod(ks * 3.1, 1.0))
 	for i in n:
 		var rv: Vector3 = (fr[i][1] as Vector3) * sd
 		var fw: Vector3 = fr[i][0]
@@ -1565,13 +1678,17 @@ static func timber_chute(pk: PropKit, kit: Dictionary, pts: PackedVector3Array, 
 			for i in n:
 				line.append(at.call(i, sx * (hw + 0.1 + r + 0.1 * float(k)), 0.2 + 0.5 * float(k)))
 			var rr: float = r * (1.0 - 0.04 * float(k))
-			_pipe(pk, kit, "hinoki", line, rr, 6, PEELED.darkened(0.12 + 0.06 * float(k)), 0, Vector3.UP, PEELED.darkened(0.26))
-			_cut(pk, kit, line[0], ((line[1] as Vector3) - (line[0] as Vector3)).normalized(), -1.0, rr, 6, 0)
-			_cut(pk, kit, line[n - 1], ((line[n - 1] as Vector3) - (line[n - 2] as Vector3)).normalized(), 1.0, rr, 6, 0)
+			var ls: float = _seed_of(line[0] + Vector3(0, float(k), 0))
+			_log_pipe(pk, kit, line, rr, 12, true, ls, 0.06 * float(k))
+			_cut(pk, kit, line[0], ((line[1] as Vector3) - (line[0] as Vector3)).normalized(), -1.0, rr, 12, 0, Vector3.UP, ls, 0.06 * float(k))
+			_cut(pk, kit, line[n - 1], ((line[n - 1] as Vector3) - (line[n - 2] as Vector3)).normalized(), 1.0, rr, 12, 0, Vector3.UP, fposmod(ls * 3.1, 1.0), 0.06 * float(k))
 		var sline: Array = []
 		for i in n:
 			sline.append(at.call(i, sx * hw * 0.6, -0.52))
-		_pipe(pk, kit, "hinoki", sline, 0.16, 6, BARK.lightened(0.08), 3, Vector3.UP, BARK_DARK)
+		var ss: float = _seed_of(sline[0])
+		_log_pipe(pk, kit, sline, 0.16, 10, false, ss, 0.1)
+		_cut(pk, kit, sline[0], ((sline[1] as Vector3) - (sline[0] as Vector3)).normalized(), -1.0, 0.16, 10, 1, Vector3.UP, ss, 0.1)
+		_cut(pk, kit, sline[n - 1], ((sline[n - 1] as Vector3) - (sline[n - 2] as Vector3)).normalized(), 1.0, 0.16, 10, 1, Vector3.UP, ss, 0.1)
 	for i in n:
 		var rv: Vector3 = fr[i][1]
 		_log(pk, kit, at.call(i, -(hw + 1.2), -0.2), at.call(i, hw + 1.2, -0.2), 0.16, 0.15, 6, true, 3, 0.1 * float(i % 2), 0, fr[i][0])

@@ -473,9 +473,9 @@ func _build_trailhead(root: Node3D, rng: RandomNumberGenerator) -> void:
 				var xf: Transform3D = _facing(r.rt(sv) * float(row[1]) * -1.0, p)
 				xf = Transform3D(xf.basis.rotated(Vector3.UP, rng.randf_range(-0.04, 0.04)), xf.origin)
 				if rng.randf() < 0.22:
-					_put(_cell_key("trailhead_cars", p), prop_kit, xf, "kei_truck", [cols[0] if rng.randf() < 0.7 else cols[1]], 900.0)
+					_put(_cell_key("carpark_cars", p), prop_kit, xf, "kei_truck", [cols[0] if rng.randf() < 0.7 else cols[1]], 900.0)
 				else:
-					_put(_cell_key("trailhead_cars", p), prop_kit, xf, "kei_car", [cols[rng.randi() % cols.size()], rng.randf() < 0.25], 900.0)
+					_put(_cell_key("carpark_cars", p), prop_kit, xf, "kei_car", [cols[rng.randi() % cols.size()], rng.randf() < 0.25], 900.0)
 				parked += 1
 			sv += 3.4
 	# Drinks machines and a signboard at the entrance, a toilet-hut's lantern post, people walking to the start.
@@ -484,10 +484,10 @@ func _build_trailhead(root: Node3D, rng: RandomNumberGenerator) -> void:
 		var vp: Vector3 = r.pt(ent) + r.rt(ent) * (PARK_LAT - PARK_HALF + 2.0 + 1.6 * float(k))
 		vp -= r.fw(ent) * 3.0
 		vp.y = _ground_at(vp.x, vp.z)
-		_put("trailhead", prop_kit, _facing(r.fw(ent), vp), "vending_machine", [k], 900.0)
+		_put("tozanguchi", prop_kit, _facing(r.fw(ent), vp), "vending_machine", [k], 900.0)
 	var mp: Vector3 = r.pt(ent) + r.rt(ent) * (r.half + 2.5) - r.fw(ent) * 5.0
 	mp.y = _ground_at(mp.x, mp.z)
-	_put("trailhead", prop_kit, _facing(-r.rt(ent), mp), "stone_marker", [1.8, "TOZANGUCHI", LBL], 900.0)
+	_put("tozanguchi", prop_kit, _facing(-r.rt(ent), mp), "stone_marker", [1.8, "TOZANGUCHI", LBL], 900.0)
 	for i in range(10):
 		var sv2: float = rng.randf_range(4.0, PARK_S0 - 2.0)
 		var pp: Vector3 = r.pt(sv2) + r.rt(sv2) * rng.randf_range(r.half + 1.5, r.half + 3.5)

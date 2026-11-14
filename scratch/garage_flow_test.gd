@@ -1,5 +1,7 @@
 extends Node
 
+const Guard = preload("res://scratch/user_file_guard.gd")
+
 # The garage's flow through Main, headless: the menu's GARAGE tile opens it, a car is taken out of the
 # line-up there (and the last one can't be), Esc leaves it, and the car select screen then offers only the
 # line-up; a Grand Prix podium records a trophy, and a GP TEST from a later stage doesn't. Prints PASS or
@@ -11,8 +13,9 @@ var fails := 0
 
 
 func _ready() -> void:
-	var settings_backup := FileAccess.get_file_as_string("user://settings.cfg") if FileAccess.file_exists("user://settings.cfg") else ""
-	var trophies_backup := FileAccess.get_file_as_string("user://trophies.cfg") if FileAccess.file_exists("user://trophies.cfg") else ""
+	# The player's settings and trophies, copied aside on disk (scratch/user_file_guard.gd): a run killed half way loses
+	# nothing.
+	Guard.protect("garage_flow_test", ["user://settings.cfg", "user://trophies.cfg"])
 	var CC = load("res://CarCollection.gd")
 	var T = load("res://Trophies.gd")
 	main = load("res://Main.tscn").instantiate()
@@ -83,18 +86,9 @@ func _ready() -> void:
 	await _frames(2)
 	_check(not NetworkManager.gp_trophy_eligible, "GP TEST from a later stage earns no trophy")
 	# Put things back.
-	_restore("user://settings.cfg", settings_backup)
-	_restore("user://trophies.cfg", trophies_backup)
+	Guard.restore("garage_flow_test")
 	print("RESULT %s (%d failed)" % ["PASS" if fails == 0 else "FAIL", fails])
 	get_tree().quit()
-
-
-func _restore(path: String, text: String) -> void:
-	if text == "":
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
-	else:
-		var f := FileAccess.open(path, FileAccess.WRITE)
-		f.store_string(text)
 
 
 func _check(ok: bool, what: String) -> void:

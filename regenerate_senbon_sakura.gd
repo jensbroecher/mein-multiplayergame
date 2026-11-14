@@ -386,7 +386,8 @@ func _place_gameplay(root: Node3D) -> void:
 		s_bridge0 - 46.0,                      # before the ravine's bridge
 		_closest_s(Vector2(-470.0, -45.0)),    # the valley's edge
 	])
-	# The torii path's pad lies wholly on its paving, just past where both its edges leave the road.
+	# The torii path's pad lies wholly on its paving, 20m past where both its edges leave the road: nearer, it lay in the
+	# sag where the path eases from the lap's height into its climb and its ends sank into the paving.
 	var tp: Route = _route_by_name["ToriiPath"]
 	var tp_in := 0.0
 	for lv in [-tp.half, tp.half]:
@@ -395,7 +396,7 @@ func _place_gameplay(root: Node3D) -> void:
 		["Boost_Park", fin + 30.0, 0.0],
 		["Boost_Leg2", _closest_s(Vector2(150.0, -228.0)), 2.5],
 		["Boost_Ridge", _closest_s(Vector2(-150.0, -473.0)), 0.0],
-		["Boost_Torii", maxf(12.0, tp_in + 4.0), 0.0, "ToriiPath"],
+		["Boost_Torii", maxf(24.0, tp_in + 20.0), 0.0, "ToriiPath"],  # past the sag where it eases off the lap into its climb
 	])
 	# A timber kicker on the ridge straight, past the teahouse.
 	_kicker(root, "RidgeJump", lap, _closest_s(Vector2(-330.0, -485.0)), 13.0, 1.9, 0.4)

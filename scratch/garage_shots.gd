@@ -1,5 +1,7 @@
 extends Node
 
+const Guard = preload("res://scratch/user_file_guard.gd")
+
 # Photographs the garage (Garage.gd), the whole window with its HUD, from where the walker stands or from
 # the orbit of an inspected car. Steps run in order:
 #   Godot --path . --resolution 1600x900 res://scratch/garage_shots.tscn -- <dir>
@@ -33,11 +35,10 @@ func _ready() -> void:
 		else:
 			dir = a
 	DirAccess.make_dir_recursive_absolute(dir)
-	var backup := ""
-	var tt_backup := ""
-	const TT_FILE := "user://time_trial_records.cfg"
+	# The player's settings (toggle: changes the line-up), records and trophies (trophies=demo), copied aside on disk
+	# (scratch/user_file_guard.gd): a run killed half way loses nothing.
+	Guard.protect("garage_shots", ["user://settings.cfg", "user://time_trial_records.cfg", "user://trophies.cfg"])
 	if demo:
-		tt_backup = FileAccess.get_file_as_string(TT_FILE) if FileAccess.file_exists(TT_FILE) else ""
 		var R = load("res://TimeTrialRecords.gd")
 		var demo_runs := {"LakesideLevel": [61234, 60122, 59876], "PinecrestRidgeLevel": [73401, 71988, 72300],
 				"BloombayDunesLevel": [55870, 54321, 54990], "GlacierHighwayLevel": [88012, 86655, 87001],
@@ -52,7 +53,6 @@ func _ready() -> void:
 				R.submit_lap(key, int(v), [int(v) / 2, int(v)], cars[ci % cars.size()])
 			R.submit_run(key, laps, total, cars[ci % cars.size()], true)
 			ci += 1
-		backup = FileAccess.get_file_as_string("user://trophies.cfg") if FileAccess.file_exists("user://trophies.cfg") else ""
 		var T = load("res://Trophies.gd")
 		T.record_gp("Bloombay GP", [{"name": "Me", "car_index": 16, "is_bot": false}], ["Me"])
 		T.record_gp("Bloombay GP", [{"name": "Me", "car_index": 10, "is_bot": false}], ["Me"])
@@ -153,18 +153,7 @@ func _ready() -> void:
 				garage._eye_cam.current = true
 	for ti in _toggled:
 		garage._toggle_lineup(ti)
-	if demo:
-		if tt_backup == "":
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(TT_FILE))
-		else:
-			var tf := FileAccess.open(TT_FILE, FileAccess.WRITE)
-			tf.store_string(tt_backup)
-			tf.close()
-		if backup == "":
-			DirAccess.remove_absolute(ProjectSettings.globalize_path("user://trophies.cfg"))
-		else:
-			var f := FileAccess.open("user://trophies.cfg", FileAccess.WRITE)
-			f.store_string(backup)
+	Guard.restore("garage_shots")
 	get_tree().quit()
 
 

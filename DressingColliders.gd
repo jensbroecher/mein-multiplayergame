@@ -38,6 +38,12 @@ const SELF_MOVING := ["res://KnockablePoles.gd", "res://KnockableIce.gd", "res:/
 const ROCKY := ["rock", "boulder", "block", "stone", "scree", "pebble", "mound", "ridge", "divider", "lamp",
 	"butte", "spire", "hoodoo", "formation", "slab", "crate", "barrier", "pole", "post", "mast", "telegraph", "parked"]
 const WOBBLE_MAX_HEIGHT := 5.5
+## Trees whose crowns hang down to the ground (by the mesh's file name, "tree_<kind>"), and their trunks' radius in the
+## mesh's own units: only the trunk is solid, the curtain is soft. Measured from the lower band of vertices, a weeping
+## cherry was a drum as wide as its curtain that nobody could drive in under. Every level built with WoodlandBuilder's
+## willow or MiyoshinoTrees' shidare gets it at load, no regeneration needed; a MultiMesh's `trunk_radius` meta says the
+## same for anything else.
+const WEEPING := {"shidare": 0.5, "willow": 0.3}
 ## Brush (ferns, by their mesh's file name; not tree ferns): not solid. A cart drives through it, bends
 ## it right over and loses BRUSH_DRAG of its speed entering each one.
 const BRUSH := ["fern", "buddleia", "goldenrod"]
@@ -95,6 +101,14 @@ func build(level: Node) -> void:
 		var info: Dictionary = _mesh_shape(mmi.multimesh.mesh)
 		if info.is_empty():
 			continue
+		# A weeping tree is solid only in its trunk (`WEEPING`, or a generator's meta `trunk_radius`).
+		var trunk_r: float = _weeping_trunk(mmi.multimesh.mesh)
+		if trunk_r <= 0.0:
+			trunk_r = float(mmi.get_meta(&"trunk_radius", 0.0))
+		if trunk_r > 0.0:
+			var ch: float = minf(float(info["h"]), 6.0)
+			var foot: float = maxf(mmi.multimesh.mesh.get_aabb().position.y, 0.0)
+			info = {"kind": "cyl", "r": trunk_r, "h": info["h"], "ch": ch, "centre": Vector3(0.0, foot + ch * 0.5, 0.0)}
 		var rocky: bool = _named(mmi, ROCKY)
 		var hull_mode: bool = bool(mmi.get_meta(&"hull_collider", false))
 		var min_h: float = float(mmi.get_meta(&"min_collider_height", MIN_HEIGHT))
@@ -409,6 +423,15 @@ func _soft(mmi: MultiMeshInstance3D) -> bool:
 
 
 ## What a mesh needs: a trunk cylinder or a box round its lower part, from its vertices.
+## A weeping tree's trunk radius (the mesh's units) by its file name, or 0.
+func _weeping_trunk(mesh: Mesh) -> float:
+	var file: String = mesh.resource_path.get_file()
+	for kind in WEEPING:
+		if file.contains("tree_" + str(kind)):
+			return float(WEEPING[kind])
+	return 0.0
+
+
 func _mesh_shape(mesh: Mesh) -> Dictionary:
 	var id := mesh.get_instance_id()
 	if _mesh_info.has(id):
@@ -470,7 +493,7 @@ func _mesh_shape(mesh: Mesh) -> Dictionary:
 
 
 func _shape_for(mesh: Mesh, info: Dictionary, sc: Vector3) -> Shape3D:
-	var key := "%d:%d:%d" % [mesh.get_instance_id(), roundi(sc.x * 20.0), roundi(sc.y * 20.0)]
+	var key := "%d:%d:%d:%s:%d" % [mesh.get_instance_id(), roundi(sc.x * 20.0), roundi(sc.y * 20.0), info["kind"], roundi(float(info["r"]) * 100.0)]
 	if _shape_cache.has(key):
 		return _shape_cache[key]
 	var shape: Shape3D

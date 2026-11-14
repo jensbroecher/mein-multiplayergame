@@ -1085,7 +1085,28 @@ func start_race():
 		for id in player_stats:
 			_give_start_boost(id)
 	_start_lap_timers()
+	_start_ghost()
 	_spawn_start_finish_items_delayed()
+
+
+## A time trial's ghost (TimeTrialGhost.gd): the stage's best run driven again beside the player, and the recorder of
+## this run, from the green light.
+var _ghost: Node = null
+
+func _start_ghost() -> void:
+	if not _is_time_trial():
+		return
+	var cart: Node3D = null
+	for id in player_stats:
+		if NetworkManager.players.has(id) and not NetworkManager.players[id].get("is_ai", false):
+			cart = players_container.get_node_or_null(str(id)) as Node3D
+			if cart:
+				break
+	_ghost = Node3D.new()
+	_ghost.name = "TimeTrialGhost"
+	_ghost.set_script(load("res://TimeTrialGhost.gd"))
+	add_child(_ghost)
+	_ghost.call("begin", TimeTrialRecords.key_of(scene_file_path), cart, get_target_laps())
 
 
 ## The start gantry's screen (CheckpointGate.show_start_lights): 0 = lamps up and dark,
@@ -1808,6 +1829,10 @@ func _record_run(id: int) -> void:
 		prev = TimeTrialRecords.submit_run(TimeTrialRecords.key_of(scene_file_path), stats.get("lap_times", []),
 				total, _car_name(id), bool(stats.get("run_clean", true)))
 		stats["prev_run_ms"] = prev
+		# The ghost of a new best run (clean, and faster than the one before or the first) replaces the stage's ghost.
+		if _ghost and is_instance_valid(_ghost):
+			var best: bool = bool(stats.get("run_clean", true)) and total > 0 and (prev <= 0 or total < prev)
+			_ghost.call("finish", best, total)
 	_send_timing(id, &"timing_finish", [total, prev, bool(stats.get("run_clean", true))])
 
 

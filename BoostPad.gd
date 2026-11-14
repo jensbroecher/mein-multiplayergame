@@ -170,10 +170,16 @@ func _settle() -> void:
 	# No steeper than 40 degrees: anything more is a wrong hit, not a ramp.
 	if normal.y < cos(deg_to_rad(40.0)):
 		normal = Vector3.UP
-	# Where a corner's ground falls away under that plane (a crest), sink by half of it.
+	# Where a corner's ground falls away under that plane (a crest), sink by half of it; where it rises over it (a sag:
+	# a path easing from level into a climb), lift by most of it, or the pad's ends sank into the surface (Senbon Sakura
+	# Pass's torii path).
 	var drop := 0.0
+	var rise := 0.0
 	for k in pts:
 		drop = minf(drop, ((pts[k] as Vector3) - base).dot(normal))
+		rise = maxf(rise, ((pts[k] as Vector3) - base).dot(normal))
+	if rise > 0.005:
+		drop = rise * 1.6
 	var fwd := _lap_tangent(centre)
 	if fwd.length_squared() < 1e-6:
 		fwd = -flat.z

@@ -69,6 +69,37 @@ func tri(kit: Dictionary, key: String, a: Vector3, b: Vector3, c: Vector3, na: V
 	s.add_vertex(wc)
 
 
+## tri() with a colour at each corner (shaders that read COLOR per vertex: an occlusion, a height over the ground).
+func tri_c(kit: Dictionary, key: String, a: Vector3, b: Vector3, c: Vector3, na: Vector3, nb: Vector3, nc: Vector3,
+		ca: Color, cb: Color, cc: Color, out: Vector3, ua := Vector2.ZERO, ub := Vector2.ZERO, uc := Vector2.ZERO) -> void:
+	var s := st(kit, key)
+	var wa := xf * a
+	var wb := xf * b
+	var wc := xf * c
+	var wo := (_nb * out)
+	var ra := (_nb * na).normalized()
+	var rb := (_nb * nb).normalized()
+	var rc := (_nb * nc).normalized()
+	if (wc - wa).cross(wb - wa).dot(wo) < 0.0:
+		var tp := wb
+		wb = wc
+		wc = tp
+		var tn := rb
+		rb = rc
+		rc = tn
+		var tu := ub
+		ub = uc
+		uc = tu
+		var tcol := cb
+		cb = cc
+		cc = tcol
+	for v in [[wa, ra, ua, ca], [wb, rb, ub, cb], [wc, rc, uc, cc]]:
+		s.set_color(v[3])
+		s.set_normal(v[1])
+		s.set_uv(v[2])
+		s.add_vertex(v[0])
+
+
 ## A flat quad p[0..3] (in order round its edge) facing `n`.
 func quad(kit: Dictionary, key: String, p: Array, n: Vector3, col: Color, uv: Array = []) -> void:
 	if uv.size() == 4:

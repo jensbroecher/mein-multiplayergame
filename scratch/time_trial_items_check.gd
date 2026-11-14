@@ -9,6 +9,7 @@ extends Node
 #   Godot --headless --path . res://scratch/time_trial_items_check.tscn -- [res://levels/X.tscn] [lap=62]
 
 const TTR = preload("res://TimeTrialRecords.gd")
+const Guard = preload("res://scratch/user_file_guard.gd")
 const FILES := ["user://time_trial_records.cfg", "user://lap_records.cfg"]
 
 var fails := 0
@@ -26,11 +27,9 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("lap="): lap_s = float(a.substr(4))
 		elif a.begins_with("res://"): level_path = a
-	var backup := {}
+	# Copied aside on disk first (scratch/user_file_guard.gd): a run killed half way loses nothing.
+	Guard.protect("time_trial_items_check", FILES)
 	for f in FILES:
-		backup[f] = null
-		if FileAccess.file_exists(f):
-			backup[f] = FileAccess.get_file_as_bytes(f)
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(f))
 	AudioServer.set_bus_mute(0, true)
 	NetworkManager.current_game_mode = NetworkManager.GameMode.SINGLE_PLAYER_TIME_TRIAL
@@ -107,12 +106,7 @@ func _ready() -> void:
 	for row in ui.results_container.get_children():
 		_print_texts(row, "    ")
 	print("RESULT: %s (%d failed)" % ["PASS" if fails == 0 else "FAIL", fails])
-	for f in FILES:
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(f))
-		if backup[f] != null:
-			var fa := FileAccess.open(f, FileAccess.WRITE)
-			fa.store_buffer(backup[f])
-			fa.close()
+	Guard.restore("time_trial_items_check")
 	get_tree().quit()
 
 

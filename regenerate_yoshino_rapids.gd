@@ -310,11 +310,11 @@ func _plan_race() -> void:
 		creek.push_front(Vector2(pc.x + 7.0 * sin(float(k) * 0.9) + 3.0 * sin(float(k) * 2.3), z))
 		z -= 14.0
 		k += 1
-	var c_ctrl: Array = []
-	for q in creek:
-		c_ctrl.append(INF)
-	c_ctrl[c_ctrl.size() - 1] = pond_level
-	_race.append(_race_piece("creek", creek, _levels(creek, c_ctrl, 0.55, pond_level), 0.9, 0.4, 0.9))
+	# Laid a metre at a time as a mountain brook: pools held level until the ground has fallen a cascade's height under
+	# them, then a short drop (`_cascade_levels`). Levelled only at points 14m apart it ran down in long white ramps,
+	# and between those points the ground stood up through its water.
+	var dense: Array = _densify(creek, 1.0)
+	_race.append(_race_piece("creek", dense, _cascade_levels(dense, 0.55, 0.25, CREEK_CASCADE, pond_level), 0.9, 0.4, 0.9))
 	# The park's garden stream: from its spring pool by the promenade, under the drum bridge, down through the park.
 	var garden: Array = GARDEN_STREAM.duplicate()
 	var g_ctrl: Array = []
@@ -327,6 +327,43 @@ func _plan_race() -> void:
 	print("  the garden stream: %.0fm from its pool (%.1fm) to the river" % [_poly_len(garden), float(g_lv[0])])
 	print("  the mill race: the flume %.0fm from the pond (water %.1fm) to the wheel, the pit's water %.1fm, the brook %.0fm" % [
 			d + absf(float(fl[3]) - float(fl[4])) * ms, pond_level, _pit_level, _poly_len(brook)])
+
+
+## A cascade's least drop on the creek down to the mill pond (m): smaller falls are held back as level pools.
+const CREEK_CASCADE := 0.45
+
+## `pts` resampled every `step` metres (the ends kept).
+func _densify(pts: Array, step: float) -> Array:
+	var out: Array = []
+	for i in range(pts.size() - 1):
+		var a: Vector2 = pts[i]
+		var b: Vector2 = pts[i + 1]
+		var m: int = maxi(1, int(ceil(a.distance_to(b) / step)))
+		for k in range(m):
+			out.append(a.lerp(b, float(k) / float(m)))
+	out.append(pts[pts.size() - 1])
+	return out
+
+
+## A brook's water levels at `pts` (a metre apart): pools and short cascades. The water stays at a pool's level while
+## the uncut ground lies at least `free` over it; it drops to the ground's line (`free` under it) once that has fallen
+## `cascade` under the pool, or at once where the ground would come within `min_free` of the water. Never rising
+## downstream, never under `floor_y`, and the last point falls into `floor_y` (the pond).
+func _cascade_levels(pts: Array, free: float, min_free: float, cascade: float, floor_y: float) -> Array:
+	var out: Array = []
+	var env := INF
+	var pool := INF
+	for i in range(pts.size()):
+		var p: Vector2 = pts[i]
+		var nat: float = _natural_base(p.x, p.y)
+		env = minf(env, nat - free)
+		if pool == INF:
+			pool = env
+		if env < pool - cascade or pool > nat - min_free:
+			pool = env
+		out.append(maxf(pool, floor_y))
+	out[out.size() - 1] = floor_y
+	return out
 
 
 ## A channel piece: see `_race`. Its points are resampled every metre.
@@ -532,6 +569,45 @@ func _plan_routes() -> void:
 	_report_profile(r)
 	print("  the raft crossing: on the water from %.0f to %.0fm of %.0fm" % [raft_s0, raft_s1, r.length])
 	shortcuts = [["RaftCrossing", 0.6]]
+
+
+## The mill wheel's loop, levelled by its measured RMS (see the sound's comment in _build_race_water).
+const MILL_WHEEL_DB := -4.0
+
+## How high a moored river boat rides over its waterline (game metres): its floor (0.095 life under the waterline) and
+## the river's ripples clear of it.
+const BOAT_LIFT := 0.30
+
+## The raft train's deck over the water (game metres): the logs' tops are 0.24-0.26 (life) over the waterline.
+const RAFT_DECK := 0.26 * PROP_SCALE + 0.01
+## Over this far either side of the water the crossing's path eases down from the bank to the rafts' deck.
+const RAFT_EASE := 24
+
+## The raft crossing lies on the rafts all the way over the water and comes down the banks to them: smoothed with the
+## banks, the planned path stood 0.8m over the first raft and 1.4m over the last, and its paving ended in the air.
+func _shape_heights(r: Route, ys: PackedFloat32Array) -> void:
+	if r.name != "RaftCrossing":
+		return
+	var n: int = ys.size()
+	var i0: int = clampi(int(floor(raft_s0)), 1, n - 2)
+	var i1: int = clampi(int(ceil(raft_s1)), 1, n - 2)
+	for i in range(i0, i1 + 1):
+		ys[i] = _water_y((r.at(float(i))["p"] as Vector2).x) + RAFT_DECK
+	for e in [0, 1]:
+		var ia: int = i0 if e == 0 else i1
+		var stp: int = -1 if e == 0 else 1
+		var ib: int = clampi(ia + stp * RAFT_EASE, 1, n - 2)
+		var L: float = float(absi(ib - ia))
+		if L < 2.0:
+			continue
+		var ya: float = ys[ia]
+		var yb: float = ys[ib]
+		var gb: float = (ys[ib + stp] - ys[ib - stp]) * 0.5
+		for k in range(1, int(L)):
+			var t: float = float(k) / L
+			var t2: float = t * t
+			var t3: float = t2 * t
+			ys[ia + k * stp] = (2.0 * t3 - 3.0 * t2 + 1.0) * ya + (-2.0 * t3 + 3.0 * t2) * yb + (t3 - t2) * gb * L
 
 
 func _sections(r: Route) -> Array:
@@ -760,6 +836,7 @@ func _build_water(root: Node3D) -> void:
 		pools.append(Vector4(BAY_C.x + k * BAY_R.x * 0.45, _water_y(BAY_C.x), BAY_C.y - 1.0, BAY_R.y * 0.95))
 	node.set("pools", pools)
 	_build_race_water(root, mat)
+	_register_race_water(node)
 
 
 ## Adds one triangle to `st`, wound clockwise from above (Godot's front face). Each vertex: [position, colour, uv].
@@ -818,6 +895,45 @@ func _build_bay_water(node: Node3D, mat: Material) -> void:
 	print("  the log pond: %d cells of water" % cells)
 
 
+## The mill race's water for the carts: every wet channel (the creek, the pit, the brook, the park's garden stream) as a
+## strip of RiverWater at its own levels, the mill pond and the garden's spring pool as pools, and the bounds widened
+## to take them in. Drawn but left out, a cart drove through them as if they were dry: no spray, no splash, no drag.
+func _register_race_water(node: Node3D) -> void:
+	var pts: PackedVector3Array = node.get("strip_points")
+	var halves: PackedFloat32Array = node.get("strip_half_widths")
+	var starts: PackedInt32Array = node.get("strip_starts")
+	var bounds: Rect2 = node.get("water_bounds")
+	var added := 0
+	for pc in _race:
+		if not bool(pc["wet"]):
+			continue
+		var ppts: PackedVector2Array = pc["pts"]
+		var lv: PackedFloat32Array = pc["lv"]
+		var hw: float = _race_half_water(pc) + 0.1
+		starts.append(pts.size())
+		var i := 0
+		while i < ppts.size():
+			pts.append(Vector3(ppts[i].x, lv[i], ppts[i].y))
+			halves.append(hw)
+			bounds = bounds.expand(ppts[i] + Vector2(hw, hw)).expand(ppts[i] - Vector2(hw, hw))
+			if i == ppts.size() - 1:
+				break
+			i = mini(i + 2, ppts.size() - 1)
+		added += 1
+	var pools: Array[Vector4] = []
+	for q in node.get("pools"):
+		pools.append(q)
+	for pd in _ponds:
+		pools.append(Vector4(pd.x, pd.y, pd.z, pd.w + 0.3))
+		bounds = bounds.expand(Vector2(pd.x, pd.z) + Vector2(pd.w + 1.0, pd.w + 1.0)).expand(Vector2(pd.x, pd.z) - Vector2(pd.w + 1.0, pd.w + 1.0))
+	node.set("strip_points", pts)
+	node.set("strip_half_widths", halves)
+	node.set("strip_starts", starts)
+	node.set("pools", pools)
+	node.set("water_bounds", bounds)
+	print("  the carts' water: the river, %d mill race and garden channels, %d pools, bounds %s" % [added, pools.size(), bounds])
+
+
 ## The mill race's running water: the creek, the pond, the flume, over the wheel, the pit and the brook.
 func _build_race_water(root: Node3D, river_mat: ShaderMaterial) -> void:
 	var holder := Node3D.new()
@@ -851,9 +967,11 @@ func _build_race_water(root: Node3D, river_mat: ShaderMaterial) -> void:
 			if i > 0:
 				dist += ppts[i].distance_to(ppts[i - 1])
 			var fall: float = (lv[maxi(i - 1, 0)] - lv[mini(i + 1, n - 1)]) / maxf(pa.distance_to(pb), 0.5)
-			var turb: float = clampf(fall * 4.0, 0.08, 1.0)
+			# Streaks of foam over the water, never a white sheet: the creek's cascades fall 0.15-0.3 a metre, and at
+			# fall x 4 (up to 0.78) every drop came out white from one boulder to the other.
+			var turb: float = clampf(fall * 2.2, 0.08, 0.5)
 			if String(pc["name"]) == "pit":
-				turb = 0.95
+				turb = 0.6  # churned under the wheel (at 0.95 the pit read as a slab of white)
 			var cur: float = clampf(0.5 + fall * 8.0, 0.5, 1.6)
 			var row: Array = []
 			for k in range(3):
@@ -908,48 +1026,27 @@ func _build_race_water(root: Node3D, river_mat: ShaderMaterial) -> void:
 	holder.add_child(mi)
 	_build_wheel_fall(holder, lip + Vector3(0, FLUME_WATER, 0))
 	var axle: Vector3 = _mill_xf * (rk.sawmill_wheel_at() * PROP_SCALE)
-	_player(holder, "MillWheelWater", "res://sounds/Gentle_flowing_water.wav", axle, -3.0, 9.0, 90.0)
+	# The wheel itself (tools/elevenlabs `miyo_mill_wheel_b`, RMS -20.2 dBFS: the buckets filling and spilling, the timber
+	# wheel's creak; the first take dropped out for two seconds), and the race's water running on under it.
+	_player(holder, "MillWheel", "res://sounds/miyoshino/mill_wheel_loop_b.wav", axle, MILL_WHEEL_DB, 10.0, 110.0)
+	_player(holder, "MillWheelWater", "res://sounds/Gentle_flowing_water.wav", axle + Vector3(0, -2.0, 4.0), -9.0, 7.0, 70.0)
 	_player(holder, "BrookWater", "res://sounds/Gentle_flowing_water.wav", Vector3(_mill_xf.origin.x + 4.0, _pit_level, -118.0), -8.0, 6.0, 60.0)
 
 
-## The water spilling off the flume's lip into the wheel's buckets, round its downstream side and down into the pit: a
-## curtain hugging the rim (waterfall.gdshader).
+## The wheel's water outside its buckets (the water in them turns with the wheel: `_build_wheel_water`): the flume's
+## water pouring off its lip into the bucket under it (a thin sheet for its body, drops round it), the buckets spilling
+## from their mouths as they tip past the axle's height (streams of drops falling into the pit), a splash and a little
+## mist where they land and drips off the rising side's rim. Particles (`water_streak.gdshader`: each drop a streak along
+## its fall, turned to the camera). The spills had been sheets standing under the rim, which read as panes of glass; at
+## first one curtain wrapped round the rim's downstream side like a band.
 func _build_wheel_fall(holder: Node3D, lip: Vector3) -> void:
 	var rk: Script = load("res://MiyoshinoRiverKit.gd")
 	var axle: Vector3 = _mill_xf * (rk.sawmill_wheel_at() * PROP_SCALE)
-	var wr: float = 2.4 * PROP_SCALE + 0.08
-	var path: Array = [lip, lip + Vector3(0, -0.12, 0.12)]
-	var th0: float = asin(clampf((lip.z + 0.25 - axle.z) / wr, 0.0, 0.9))
-	var th: float = th0
-	while th < deg_to_rad(176.0):
-		path.append(axle + Vector3(0, cos(th), sin(th)) * wr)
-		th += deg_to_rad(6.0)
-	var bottom: Vector3 = path[path.size() - 1]
-	path.append(Vector3(bottom.x, _pit_level + 0.02, bottom.z - 0.15))
-	var total := 0.0
-	for i in range(path.size() - 1):
-		total += (path[i] as Vector3).distance_to(path[i + 1])
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var hw: float = FLUME_IW * 0.5 - 0.04
-	var acc := 0.0
-	var rows: Array = []
-	for i in range(path.size()):
-		if i > 0:
-			acc += (path[i] as Vector3).distance_to(path[i - 1])
-		var p: Vector3 = path[i]
-		var out := Vector3(0, p.y - axle.y, p.z - axle.z).normalized()
-		var row: Array = []
-		for k in range(3):
-			var u: float = float(k) / 2.0
-			row.append([p + Vector3(lerpf(-hw, hw, u), 0, 0), out, Vector2(u, acc / total)])
-		rows.append(row)
-	for i in range(rows.size() - 1):
-		for k in range(2):
-			for v in [rows[i][k], rows[i][k + 1], rows[i + 1][k], rows[i][k + 1], rows[i + 1][k + 1], rows[i + 1][k]]:
-				st.set_normal(v[1])
-				st.set_uv(v[2])
-				st.add_vertex(v[0])
+	var wr: float = 2.4 * PROP_SCALE
+	var hw: float = FLUME_IW * 0.5 - 0.05
+	# The pour's sheet: off the lip, arcing forward and down into the bucket under it (it ends inside the rim).
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://waterfall.gdshader")
 	var streak := FastNoiseLite.new()
 	streak.seed = 7311
 	streak.frequency = 0.08
@@ -959,19 +1056,227 @@ func _build_wheel_fall(holder: Node3D, lip: Vector3) -> void:
 	tex.noise = streak
 	tex.width = 256
 	tex.height = 256
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://waterfall.gdshader")
 	mat.set_shader_parameter("streak_noise", tex)
-	mat.set_shader_parameter("opacity", 0.85)
-	mat.set_shader_parameter("strand_count", 3.0)
-	mat.set_shader_parameter("fall_speed", 1.1)
-	mat.set_shader_parameter("body_color", Color(0.48, 0.66, 0.62))
+	mat.set_shader_parameter("opacity", 0.62)
+	mat.set_shader_parameter("strand_count", 4.0)
+	mat.set_shader_parameter("fall_speed", 1.6)
+	mat.set_shader_parameter("body_color", Color(0.50, 0.68, 0.66))
+	var land_th: float = deg_to_rad(17.0)
+	var land: Vector3 = axle + Vector3(0, cos(land_th), sin(land_th)) * (wr - 0.45)
+	var ctrl := Vector3(lip.x, lip.y - 0.05, lip.z + (land.z - lip.z) * 0.9)
+	var pour: Array = []
+	for i in range(9):
+		var t: float = float(i) / 8.0
+		pour.append(lip.lerp(ctrl, t).lerp(ctrl.lerp(land, t), t))
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_fall_ribbon(st, pour, hw * 0.8, hw * 0.6, Vector3.RIGHT)
 	var mi := MeshInstance3D.new()
 	mi.name = "WheelFallWater"
 	mi.mesh = _save_res(st.commit(), "wheel_fall")
 	mi.material_override = _save_res(mat, "wheel_fall_material")
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	holder.add_child(mi)
+	# The pour's drops: off the lip's whole width, forward with the flume's flow.
+	_drops(holder, "WheelPour", lip + Vector3(0, -0.04, 0.02), _process_drops({"box": Vector3(hw, 0.04, 0.03), "dir": Vector3(0, -0.2, 1),
+			"spread": 7.0, "v": Vector2(1.1, 1.7), "life": 0.42}), Vector2(0.06, 0.32), 260, 0.42)
+	# The spills: from the rim's mouths on the loaded side, from where a bucket starts to tip to near the bottom.
+	var pts := PackedVector3Array()
+	var origin: Vector3 = axle + Vector3(0, -wr * 0.55, wr * 0.75)
+	for i in range(18):
+		var th: float = deg_to_rad(lerpf(104.0, 156.0, float(i) / 17.0))
+		for k in range(5):
+			var x: float = lerpf(-0.72, 0.72, (float(k) + 0.5 * float(i % 2)) / 4.5)
+			pts.append(axle + Vector3(x, cos(th) * (wr - 0.1), sin(th) * (wr - 0.1)) - origin)
+	var spill := _process_drops({"points": pts, "dir": Vector3(0, -1, 0.3), "spread": 14.0, "v": Vector2(0.4, 1.3), "life": 1.0})
+	_drops(holder, "WheelSpill", origin, spill, Vector2(0.07, 0.42), 520, 1.0)
+	# The splash where the spills hit the pit, and where the pour lands in the bucket.
+	var pit_at := Vector3(axle.x, _pit_level + 0.04, axle.z + wr * 0.72)
+	_drops(holder, "WheelSplash", pit_at, _process_drops({"box": Vector3(0.8, 0.02, wr * 0.22), "dir": Vector3(0, 1, 0.1), "spread": 55.0,
+			"v": Vector2(1.0, 2.6), "life": 0.55}), Vector2(0.05, 0.14), 200, 0.55)
+	_drops(holder, "WheelPourSplash", land + Vector3(0, 0.25, 0), _process_drops({"box": Vector3(hw, 0.03, 0.1), "dir": Vector3(0, 1, 0.3),
+			"spread": 50.0, "v": Vector2(0.6, 1.4), "life": 0.35}), Vector2(0.04, 0.1), 70, 0.35)
+	_mist(holder, "WheelMist", pit_at + Vector3(0, 0.3, 0), Vector3(0.9, 0.2, wr * 0.25))
+	# Drips off the rising side's rim (the buckets come up empty, still running wet).
+	var dpts := PackedVector3Array()
+	var dorig: Vector3 = axle + Vector3(0, 0, -wr * 0.6)
+	for i in range(30):
+		var th3: float = deg_to_rad(lerpf(-165.0, -30.0, float(i) / 29.0))
+		dpts.append(axle + Vector3(lerpf(-0.75, 0.75, fposmod(float(i) * 0.618, 1.0)), cos(th3) * (wr - 0.05), sin(th3) * (wr - 0.05)) - dorig)
+	_drops(holder, "WheelDrips", dorig, _process_drops({"points": dpts, "dir": Vector3(0, -1, 0), "spread": 4.0, "v": Vector2(0.1, 0.5), "life": 1.0}),
+			Vector2(0.03, 0.14), 40, 1.0)
+
+
+## A falling ribbon of water through `pts` (top to bottom), `w0` half wide at the top and `w1` at the bottom, across
+## `across`; UV.y 0 at its top and 1 at its foot (waterfall.gdshader).
+func _fall_ribbon(st: SurfaceTool, pts: Array, w0: float, w1: float, across: Vector3) -> void:
+	var total := 0.0
+	for i in range(pts.size() - 1):
+		total += (pts[i] as Vector3).distance_to(pts[i + 1])
+	var acc := 0.0
+	var rows: Array = []
+	for i in range(pts.size()):
+		if i > 0:
+			acc += (pts[i] as Vector3).distance_to(pts[i - 1])
+		var p: Vector3 = pts[i]
+		var t: float = acc / maxf(total, 0.001)
+		var fw: Vector3 = ((pts[mini(i + 1, pts.size() - 1)] as Vector3) - (pts[maxi(i - 1, 0)] as Vector3)).normalized()
+		var n: Vector3 = across.cross(fw).normalized()
+		var w: float = lerpf(w0, w1, t)
+		var row: Array = []
+		for k in range(3):
+			var u: float = float(k) / 2.0
+			row.append([p + across * lerpf(-w, w, u), n, Vector2(u, t)])
+		rows.append(row)
+	for i in range(rows.size() - 1):
+		for k in range(2):
+			for v in [rows[i][k], rows[i][k + 1], rows[i + 1][k], rows[i][k + 1], rows[i + 1][k + 1], rows[i + 1][k]]:
+				st.set_normal(v[1])
+				st.set_uv(v[2])
+				st.add_vertex(v[0])
+
+
+## A process material for falling water: emitted from a box (`box`: half extents) or from `points` (relative to the
+## emitter), along `dir` with `spread` degrees and a speed in `v`, under gravity, each particle's Y along its velocity
+## (the streaks), fading out over its last third.
+func _process_drops(o: Dictionary) -> ParticleProcessMaterial:
+	var pm := ParticleProcessMaterial.new()
+	if o.has("points"):
+		var pts: PackedVector3Array = o["points"]
+		var img := Image.create(pts.size(), 1, false, Image.FORMAT_RGBF)
+		for i in range(pts.size()):
+			img.set_pixel(i, 0, Color(pts[i].x, pts[i].y, pts[i].z))
+		pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_POINTS
+		pm.emission_point_texture = ImageTexture.create_from_image(img)
+		pm.emission_point_count = pts.size()
+	else:
+		pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+		pm.emission_box_extents = o["box"]
+	pm.direction = (o["dir"] as Vector3).normalized()
+	pm.spread = float(o["spread"])
+	pm.initial_velocity_min = (o["v"] as Vector2).x
+	pm.initial_velocity_max = (o["v"] as Vector2).y
+	pm.gravity = Vector3(0, -9.8, 0)
+	pm.particle_flag_align_y = true
+	pm.scale_min = 0.7
+	pm.scale_max = 1.25
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.08, 0.65, 1.0])
+	fade.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 1), Color(1, 1, 1, 0.9), Color(1, 1, 1, 0)])
+	var ft := GradientTexture1D.new()
+	ft.gradient = fade
+	pm.color_ramp = ft
+	return pm
+
+
+var _streak_mat: Material
+
+## A GPUParticles3D of water drops at `at`: `size` the drop's quad (width, length), `amount` of them alive at once.
+func _drops(holder: Node3D, node_name: String, at: Vector3, pm: ParticleProcessMaterial, size: Vector2, amount: int, life: float) -> void:
+	if _streak_mat == null:
+		var sm := ShaderMaterial.new()
+		sm.shader = load("res://water_streak.gdshader")
+		_streak_mat = _save_res(sm, "wheel_drop_material")
+	var q := QuadMesh.new()
+	q.size = size
+	q.material = _streak_mat
+	var p := GPUParticles3D.new()
+	p.name = node_name
+	p.process_material = _save_res(pm, "wheel_%s_process" % node_name.to_lower())
+	p.draw_pass_1 = _save_res(q, "wheel_%s_quad" % node_name.to_lower())
+	p.amount = amount
+	p.lifetime = life
+	p.preprocess = life
+	p.position = at
+	p.visibility_aabb = AABB(Vector3(-4, -6, -5), Vector3(8, 9, 10))
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	holder.add_child(p)
+
+
+## A little mist over the pit: soft sprites rising slowly and fading.
+func _mist(holder: Node3D, node_name: String, at: Vector3, extents: Vector3) -> void:
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.set_color(1, Color(1, 1, 1, 0))
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(0.5, 0.0)
+	gt.width = 64
+	gt.height = 64
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.vertex_color_use_as_albedo = true
+	m.albedo_texture = gt
+	m.albedo_color = Color(0.92, 0.96, 0.97, 0.16)
+	var q := QuadMesh.new()
+	q.size = Vector2(1.1, 1.1)
+	q.material = _save_res(m, "wheel_mist_material")
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = extents
+	pm.direction = Vector3(0, 1, 0)
+	pm.spread = 30.0
+	pm.initial_velocity_min = 0.15
+	pm.initial_velocity_max = 0.45
+	pm.gravity = Vector3.ZERO
+	pm.scale_min = 0.8
+	pm.scale_max = 1.6
+	var sc := Curve.new()
+	sc.add_point(Vector2(0.0, 0.5))
+	sc.add_point(Vector2(1.0, 1.4))
+	var sct := CurveTexture.new()
+	sct.curve = sc
+	pm.scale_curve = sct
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.3, 1.0])
+	fade.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
+	var ft := GradientTexture1D.new()
+	ft.gradient = fade
+	pm.color_ramp = ft
+	var p := GPUParticles3D.new()
+	p.name = node_name
+	p.process_material = _save_res(pm, "wheel_mist_process")
+	p.draw_pass_1 = _save_res(q, "wheel_mist_quad")
+	p.amount = 16
+	p.lifetime = 2.6
+	p.preprocess = 2.6
+	p.position = at
+	p.visibility_aabb = AABB(Vector3(-3, -1, -3), Vector3(6, 5, 6))
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	holder.add_child(p)
+
+
+## The water in the wheel's buckets: a quad a bucket, turning with the wheel, that mill_bucket_water.gdshader lays level
+## in its bucket and fills by where the bucket is (see the shader). In the wheel's own frame, at life size.
+func _build_wheel_water(wheel: MeshInstance3D) -> void:
+	var n: int = int(river_kit.get_script_constant_map().get("WHEEL_BUCKETS", 16)) if river_kit else 16
+	var hx: float = 1.1 * 0.5 - 0.08
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for k in range(n):
+		var a0: float = TAU * float(k) / float(n)
+		var vs: Array = []
+		for c in [[-hx, -0.5], [hx, -0.5], [-hx, 0.5], [hx, 0.5]]:
+			vs.append([Vector3(float(c[0]), cos(a0) * 2.15, sin(a0) * 2.15), Vector2(a0, float(c[1])), Vector2(float(c[0]), 0.0)])
+		for i in [0, 2, 1, 1, 2, 3]:
+			st.set_normal(Vector3.UP)
+			st.set_uv(vs[i][1])
+			st.set_uv2(vs[i][2])
+			st.add_vertex(vs[i][0])
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://mill_bucket_water.gdshader")
+	var mi := MeshInstance3D.new()
+	mi.name = "BucketWater"
+	mi.mesh = _save_res(st.commit(), "wheel_bucket_water")
+	mi.material_override = _save_res(mat, "wheel_bucket_water_material")
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.custom_aabb = AABB(Vector3(-1.0, -2.8, -2.8), Vector3(2.0, 5.6, 5.6))
+	mi.set_meta(&"skip_dressing_colliders", true)
+	wheel.add_child(mi)
 
 
 # ======================================================================================
@@ -1076,7 +1381,9 @@ func _build_village(root: Node3D, rng: RandomNumberGenerator, fin: float) -> voi
 	for i in range(6):
 		var x: float = lerpf(-150.0, 380.0, float(i) / 5.0) + rng.randf_range(-20.0, 20.0)
 		var z: float = _river_z(x) + _river_half(x) - (3.0 if i % 2 == 0 else -1.5)
-		var at := Vector3(x, _water_y(x) if i % 2 == 0 else _ground_at(x, z) + 0.15, z)
+		# Afloat they ride BOAT_LIFT high: the hull's inside floor lies under the waterline (it draws 0.14), and the river's
+		# surface, which nothing keeps out of a hull, showed in every boat as if it were swamped.
+		var at := Vector3(x, _water_y(x) + BOAT_LIFT if i % 2 == 0 else maxf(_ground_at(x, z) + 0.15, _water_y(x) + BOAT_LIFT), z)
 		var bxf := Transform3D(Basis(Vector3.UP, rng.randf_range(1.2, 1.9)), at)
 		_put(_cell_key("boats", at), river_kit, bxf, "river_boat", [i % 3], 600.0)
 	_build_hill_pagoda(rng)
@@ -1470,14 +1777,14 @@ func _promenade_and_avenue(paving: SurfaceTool, rng: RandomNumberGenerator, fin:
 			_note_circle(_xz(cp), 2.0)
 		var lx: Transform3D = _beside(lap, s, PROM_LAT - PROM_W * 0.5 - 0.7)
 		if k % 2 == 1 and far_from.call(s, 10.0) and _run_d(lx.origin.x, lx.origin.z) > PARK_RUN_CLEAR:
-			_put(_cell_key("riverside", lx.origin), prop_kit, lx, "street_lantern", [4.2], 450.0)
+			_put(_cell_key("promenade", lx.origin), prop_kit, lx, "street_lantern", [4.2], 450.0)
 			_note_circle(_xz(lx.origin), 1.0)
 		# Benches on the promenade's river side, looking at the water.
 		if k % 3 == 1 and far_from.call(s, 12.0) and (s < fin + FAIR.x - 6.0 or s > fin + FAIR.y + 6.0):
 			var bx: Transform3D = _beside(lap, s + 4.0, PROM_LAT + PROM_W * 0.5 + 0.9)
 			bx = Transform3D(Basis(Vector3.UP, PI) * bx.basis, bx.origin)
 			if _shore_d(bx.origin.x, bx.origin.z) > 6.0 and not _occupied(bx.origin.x, bx.origin.z) and _run_d(bx.origin.x, bx.origin.z) > PARK_RUN_CLEAR:
-				_put(_cell_key("riverside", bx.origin), prop_kit, bx, "park_bench", [], 420.0)
+				_put(_cell_key("promenade", bx.origin), prop_kit, bx, "park_bench", [], 420.0)
 				_note_circle(_xz(bx.origin), 2.5)
 				if rng.randf() < 0.6:
 					_person(_bench_seat(bx, rng.randf_range(-0.6, 0.6)), bx.basis.z, rng.randf_range(0.88, 1.05), true)
@@ -1492,7 +1799,7 @@ func _promenade_and_avenue(paving: SurfaceTool, rng: RandomNumberGenerator, fin:
 		k += 1
 	for ds in [-60.0, -30.0, 30.0, 60.0]:
 		var nx: Transform3D = _beside(lap, fin + ds, road_half + 4.5)
-		_put(_cell_key("riverside", nx.origin), prop_kit, nx, "nobori", [Color(0.20, 0.30, 0.55)], 420.0)
+		_put(_cell_key("promenade", nx.origin), prop_kit, nx, "nobori", [Color(0.20, 0.30, 0.55)], 420.0)
 	# People strolling on the promenade.
 	s = p0 + 8.0
 	while s < p1:
@@ -1525,6 +1832,53 @@ func _build_park(root: Node3D, paving: SurfaceTool, rng: RandomNumberGenerator, 
 			if q.distance_to(pz[0]) < float(pz[1]) + r:
 				return true
 		return false
+	# The stones along the garden stream, planned first so the azaleas and irises keep off them (they grew through
+	# them), and the two drum bridges' decks (irises stood up through the planks).
+	var gpc: Dictionary = {}
+	for pc in _race:
+		if String(pc["name"]) == "garden":
+			gpc = pc
+	var stream_rocks: Array = []
+	var rock_rng := RandomNumberGenerator.new()
+	rock_rng.seed = seed_base + 4111
+	if not gpc.is_empty():
+		var gp0: PackedVector2Array = gpc["pts"]
+		var lv0: PackedFloat32Array = gpc["lv"]
+		var hw0: float = _race_half_water(gpc)
+		for i in range(4, gp0.size() - 1, 4):
+			var q0: Vector2 = gp0[i]
+			if _shore_d(q0.x, q0.y) < 3.0:
+				break
+			var dir0: Vector2 = (gp0[i + 1] - gp0[i - 1]).normalized()
+			var side: float = 1.0 if (i / 4) % 2 == 0 else -1.0
+			var rq: Vector2 = q0 + Vector2(-dir0.y, dir0.x) * side * (hw0 + rock_rng.randf_range(0.1, 0.5))
+			var rs: float = rock_rng.randf_range(0.45, 0.85)
+			if not near_path.call(rq, 0.5) and not _occupied(rq.x, rq.y) and _run_d(rq.x, rq.y) > PARK_RUN_CLEAR:
+				stream_rocks.append([rq, rs, minf(_ground_at(rq.x, rq.y), lv0[i] + 0.2), i * 31 + 7])
+	var gpool0 := Vector2(GARDEN_POOL.x, GARDEN_POOL.y)
+	for k in range(9):
+		if k % 3 == 1:
+			var a0: float = TAU * float(k) / 9.0 + 0.35
+			var rq2: Vector2 = gpool0 + Vector2(cos(a0), sin(a0)) * (GARDEN_POOL.z + 0.4)
+			stream_rocks.append([rq2, 0.7, _ground_at(rq2.x, rq2.y), k * 17 + 3])
+	# A stone of half-size r is about r * PROP_SCALE across its half: nothing grows within that and a margin.
+	var on_rock := func(q: Vector2, margin: float) -> bool:
+		for rk in stream_rocks:
+			if q.distance_to(rk[0]) < float(rk[1]) * PROP_SCALE + margin:
+				return true
+		return false
+	var bridges: Array = []
+	if cross_s > 0.0:
+		var bcp: Vector3 = lap.spot(cross_s, PROM_LAT, 0.0)["pos"]
+		var bfw: Vector3 = lap.fw(cross_s)
+		bridges.append([Vector2(bcp.x, bcp.z), Vector2(bfw.x, bfw.z).normalized(), 9.4 * PROP_SCALE * 0.5 + 0.8, 3.0 * PROP_SCALE * 0.5 + 0.8])
+	var on_bridge := func(q: Vector2) -> bool:
+		for br in bridges:
+			var dv: Vector2 = q - (br[0] as Vector2)
+			var ax: Vector2 = br[1]
+			if absf(dv.dot(ax)) < float(br[2]) and absf(dv.dot(Vector2(-ax.y, ax.x))) < float(br[3]):
+				return true
+		return false
 	# The path's own little drum bridge over the stream.
 	var path1: Array = PARK_PATHS[1]
 	var b2: Vector2 = path1[2]
@@ -1535,6 +1889,7 @@ func _build_park(root: Node3D, paving: SurfaceTool, rng: RandomNumberGenerator, 
 	_park_bridge = Transform3D(Basis(bf, Vector3.UP, bf.cross(Vector3.UP).normalized()), Vector3(b2.x, b2y, b2.y))
 	_put("park_bridge", prop_kit, _park_bridge, "arched_bridge", [PARK_BRIDGE.x, PARK_BRIDGE.y, PARK_BRIDGE.z], 800.0)
 	_note_circle(b2, 6.0)
+	bridges.append([b2, bd, PARK_BRIDGE.x * PROP_SCALE * 0.5 + 0.8, PARK_BRIDGE.y * PROP_SCALE * 0.5 + 0.8])
 	# The tea house facing east across the stream, its bench and parasol toward the water.
 	var tf := Vector3(1.0, 0.0, 0.0)
 	var tx: Transform3D = _facing(tf, Vector3.ZERO)
@@ -1597,7 +1952,8 @@ func _build_park(root: Node3D, paving: SurfaceTool, rng: RandomNumberGenerator, 
 			while t < l - 1.0:
 				for sd in [-1.0, 1.0]:
 					var q: Vector2 = a + d * t + Vector2(-d.y, d.x) * sd * (PARK_PATH_HALF + 1.3)
-					if fmod(t + sd * 7.0, 14.0) < 9.0 and not _occupied(q.x, q.y) and _race_d(q.x, q.y) > 1.2 and not near_path.call(q, 0.6) and _run_d(q.x, q.y) > PARK_RUN_CLEAR:
+					if fmod(t + sd * 7.0, 14.0) < 9.0 and not _occupied(q.x, q.y) and _race_d(q.x, q.y) > 1.2 and not near_path.call(q, 0.6) and _run_d(q.x, q.y) > PARK_RUN_CLEAR \
+							and not on_rock.call(q, 1.0) and not on_bridge.call(q):
 						extra_trees.append(["tsutsuji", q.x, q.y, rng.randf_range(0.6, 0.8), rng.randi_range(0, 1)])
 				t += 2.4
 	# Trees on the lawns, clear of the paths, the stream and the tea house.
@@ -1614,10 +1970,9 @@ func _build_park(root: Node3D, paving: SurfaceTool, rng: RandomNumberGenerator, 
 		_note_circle(q, 3.0)
 		planted += 1
 	# The garden stream: rocks along its banks, purple irises in patches, two yukimi lanterns by the pool.
-	var gpc: Dictionary = {}
-	for pc in _race:
-		if String(pc["name"]) == "garden":
-			gpc = pc
+	for rk in stream_rocks:
+		var rp: Vector2 = rk[0]
+		_put(_cell_key("park_rocks", Vector3(rp.x, 0, rp.y)), prop_kit, Transform3D(Basis(), Vector3(rp.x, float(rk[2]), rp.y)), "garden_rock", [rk[1], float(rk[1]) * 0.7, rk[3]], 400.0)
 	var iris_xfs: Array = []
 	if not gpc.is_empty():
 		var gp: PackedVector2Array = gpc["pts"]
@@ -1629,17 +1984,11 @@ func _build_park(root: Node3D, paving: SurfaceTool, rng: RandomNumberGenerator, 
 				break
 			var dir: Vector2 = (gp[i + 1] - gp[i - 1]).normalized()
 			var right := Vector2(-dir.y, dir.x)
-			if i % 4 == 0:
-				var side: float = 1.0 if (i / 4) % 2 == 0 else -1.0
-				var rq: Vector2 = q + right * side * (hw + rng.randf_range(0.1, 0.5))
-				if not near_path.call(rq, 0.5) and not _occupied(rq.x, rq.y) and _run_d(rq.x, rq.y) > PARK_RUN_CLEAR:
-					var rs: float = rng.randf_range(0.45, 0.85)
-					_put(_cell_key("park_rocks", Vector3(rq.x, 0, rq.y)), prop_kit, Transform3D(Basis(), Vector3(rq.x, minf(_ground_at(rq.x, rq.y), lv[i] + 0.2), rq.y)), "garden_rock", [rs, rs * 0.7, i * 31 + 7], 400.0)
 			for sd in [-1.0, 1.0]:
 				if sin(float(i) * 0.45 + sd * 1.7) < -0.1:
 					continue
 				var iq: Vector2 = q + right * sd * (hw + rng.randf_range(0.2, 0.9))
-				if near_path.call(iq, 0.3):
+				if near_path.call(iq, 0.3) or on_rock.call(iq, 0.35) or on_bridge.call(iq):
 					continue
 				var iy: float = _ground_at(iq.x, iq.y)
 				iris_xfs.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(1.3, 1.7)), Vector3(iq.x, iy - 0.05, iq.y)))
@@ -1647,10 +1996,8 @@ func _build_park(root: Node3D, paving: SurfaceTool, rng: RandomNumberGenerator, 
 	for k in range(9):
 		var a: float = TAU * float(k) / 9.0
 		var iq2: Vector2 = gpool + Vector2(cos(a), sin(a)) * (GARDEN_POOL.z + 0.7)
-		iris_xfs.append(Transform3D(Basis(Vector3.UP, a).scaled(Vector3.ONE * 1.5), Vector3(iq2.x, _ground_at(iq2.x, iq2.y) - 0.05, iq2.y)))
-		if k % 3 == 1:
-			var rq2: Vector2 = gpool + Vector2(cos(a + 0.35), sin(a + 0.35)) * (GARDEN_POOL.z + 0.4)
-			_put(_cell_key("park_rocks", Vector3(rq2.x, 0, rq2.y)), prop_kit, Transform3D(Basis(), Vector3(rq2.x, _ground_at(rq2.x, rq2.y), rq2.y)), "garden_rock", [0.7, 0.5, k * 17 + 3], 400.0)
+		if not on_rock.call(iq2, 0.35):
+			iris_xfs.append(Transform3D(Basis(Vector3.UP, a).scaled(Vector3.ONE * 1.5), Vector3(iq2.x, _ground_at(iq2.x, iq2.y) - 0.05, iq2.y)))
 	var lq: Vector2 = gpool + Vector2(-GARDEN_POOL.z - 1.6, 1.0)
 	_put("park_furniture", prop_kit, _facing(Vector3(1.0, 0.0, 0.0), Vector3(lq.x, _ground_at(lq.x, lq.y), lq.y)), "stone_lantern", [1, 1.9], 500.0)
 	if not iris_xfs.is_empty():
@@ -1943,12 +2290,16 @@ func _build_rafts(root: Node3D, rng: RandomNumberGenerator) -> void:
 	body.name = "RaftDeckBody"
 	body.set_meta(&"surface", "wood")
 	root.add_child(body)
-	var step: float = raft_len * PROP_SCALE + 0.3
-	var s: float = raft_s0 - 1.0 + step * 0.5
+	# The train runs from the path's end on the near bank to its end on the far one (it had started a metre under the
+	# paving, which cut across the first raft's logs), its sections a little apart.
+	var span: float = raft_s1 - raft_s0 - 0.3
+	var count: int = maxi(1, int(round(span / (raft_len * PROP_SCALE + 0.3))))
+	var step: float = span / float(count)
+	var s: float = raft_s0 + 0.15 + step * 0.5
 	var n := 0
 	# Two sections abreast make the deck wide enough to drive.
 	var wide: float = w_life * PROP_SCALE
-	while s < raft_s1 + 1.0 + step * 0.5:
+	while n < count:
 		var p: Vector3 = r.pt(s)
 		var fwd: Vector3 = r.fw(s)
 		var wy: float = _water_y(p.x)
@@ -1958,10 +2309,12 @@ func _build_rafts(root: Node3D, rng: RandomNumberGenerator) -> void:
 				var mi := MeshInstance3D.new()
 				mi.name = "Moored_%d_%s" % [n, "a" if side < 0.0 else "b"]
 				mi.mesh = mesh
-				mi.transform = Transform3D(basis.scaled(Vector3.ONE * PROP_SCALE), Vector3(p.x, wy, p.z) + basis.x * side * (wide + 0.2))
+				# Each section stretched a few percent along the way so the train fills the span.
+				var stretch: float = (step - 0.3) / (raft_len * PROP_SCALE)
+				mi.transform = Transform3D(Basis(basis.x * PROP_SCALE, basis.y * PROP_SCALE, basis.z * PROP_SCALE * stretch), Vector3(p.x, wy, p.z) + basis.x * side * (wide + 0.2))
 				mi.set_meta(&"skip_dressing_colliders", true)
 				holder.add_child(mi)
-		_box_shape(body, Transform3D(basis, Vector3(p.x, wy + 0.30 * PROP_SCALE - 0.6, p.z)), Vector3(wide * 2.0 + 0.4, 1.2, step + 0.2))
+		_box_shape(body, Transform3D(basis, Vector3(p.x, wy + RAFT_DECK - 0.6, p.z)), Vector3(wide * 2.0 + 0.4, 1.2, step + 0.2))
 		s += step
 		n += 1
 	# The log pond: three rafts with their loads, lying along the bay, each tied to a post on the bank.
@@ -2036,6 +2389,7 @@ func _build_yard(root: Node3D, rng: RandomNumberGenerator) -> void:
 			w.set("degrees_per_second", 26.0)
 			w.transform = Transform3D(Basis.from_scale(Vector3.ONE * PROP_SCALE), xf * (wheel_at * PROP_SCALE))
 			root.add_child(w)
+			_build_wheel_water(w)
 	print("  the sawmill at %.0f, %.0f (%.1fm up), its front %.0fm off the road's edge" % [xf.origin.x, xf.origin.z, xf.origin.y, MILL_GAP])
 	# The flume on its trestles, from the pond's sluice to the sawmill's trough.
 	var ground := func(x: float, z: float) -> float: return _ground_at(x, z)
@@ -2089,6 +2443,71 @@ func _build_yard(root: Node3D, rng: RandomNumberGenerator) -> void:
 	if not _occupied(wx.origin.x, wx.origin.z):
 		_put(_cell_key("timber", wx.origin), river_kit, wx, "log_pile", [8, 4.5, rng], 700.0)
 		_note_circle(Vector2(wx.origin.x, wx.origin.z), 6.0)
+	_build_creek_cascades(root)
+
+
+## The creek's cascades (`_cascade_levels`): a stone either side of each lip, one in the stream beside the fall now and
+## then, and a little spray where the water lands.
+func _build_creek_cascades(root: Node3D) -> void:
+	var cpc: Dictionary = {}
+	for pc in _race:
+		if String(pc["name"]) == "creek":
+			cpc = pc
+	if cpc.is_empty():
+		return
+	var pts: PackedVector2Array = cpc["pts"]
+	var lv: PackedFloat32Array = cpc["lv"]
+	var hw: float = _race_half_water(cpc)
+	var holder := Node3D.new()
+	holder.name = "CreekSpray"
+	root.add_child(holder)
+	var pm: ParticleProcessMaterial = _save_res(_process_drops({"box": Vector3(hw * 0.6, 0.02, 0.25), "dir": Vector3(0, 1, 0), "spread": 45.0,
+			"v": Vector2(0.6, 1.5), "life": 0.45}), "creek_spray_process")
+	if _streak_mat == null:
+		var sm := ShaderMaterial.new()
+		sm.shader = load("res://water_streak.gdshader")
+		_streak_mat = _save_res(sm, "wheel_drop_material")
+	var q := QuadMesh.new()
+	q.size = Vector2(0.04, 0.12)
+	q.material = _streak_mat
+	var quad: QuadMesh = _save_res(q, "creek_spray_quad")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_base + 7717
+	var n := 0
+	var i := 1
+	while i < pts.size() - 2:
+		var drop: float = lv[i] - lv[i + 1]
+		if drop < 0.3:
+			i += 1
+			continue
+		var dir: Vector2 = (pts[i + 1] - pts[i - 1]).normalized()
+		var right := Vector2(-dir.y, dir.x)
+		for sd in [-1.0, 1.0]:
+			var rq: Vector2 = pts[i] + right * sd * (hw + rng.randf_range(0.0, 0.3))
+			var rs: float = rng.randf_range(0.35, 0.6)
+			_put(_cell_key("creek_rocks", Vector3(rq.x, 0, rq.y)), prop_kit, Transform3D(Basis(), Vector3(rq.x, minf(_ground_at(rq.x, rq.y), lv[i] + 0.05), rq.y)),
+					"garden_rock", [rs, rs * 0.8, n * 37 + int(sd) + 5], 250.0)
+		if n % 2 == 0:
+			var mq: Vector2 = pts[i] + right * (1.0 if n % 4 == 0 else -1.0) * hw * 0.45
+			var ms: float = rng.randf_range(0.25, 0.4)
+			_put(_cell_key("creek_rocks", Vector3(mq.x, 0, mq.y)), prop_kit, Transform3D(Basis(), Vector3(mq.x, lv[i] - 0.35, mq.y)),
+					"garden_rock", [ms, ms * 0.9, n * 53 + 11], 250.0)
+		var foot: Vector2 = pts[mini(i + 1, pts.size() - 1)] + dir * 0.4
+		var p := GPUParticles3D.new()
+		p.name = "CreekSpray_%d" % n
+		p.process_material = pm
+		p.draw_pass_1 = quad
+		p.amount = int(clampf(drop * 50.0, 14.0, 40.0))
+		p.lifetime = 0.45
+		p.preprocess = 0.45
+		p.position = Vector3(foot.x, lv[mini(i + 1, pts.size() - 1)] + 0.03, foot.y)
+		p.visibility_aabb = AABB(Vector3(-2, -1, -2), Vector3(4, 3, 4))
+		p.visibility_range_end = 90.0
+		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		holder.add_child(p)
+		n += 1
+		i += 2
+	print("  the creek: %d cascades" % n)
 
 
 ## The forest road, twisting up and down through the cedar plantation: curve mirrors and warning signs at its four sharp
@@ -2313,7 +2732,9 @@ func _build_shortcut_paths(root: Node3D) -> void:
 ## The ground's grid halved (2m) round the garden stream and the mill's tailrace and brook: on the 4m grid their channels,
 ## a few metres wide, came out as a row of pits with the water showing in patches.
 func _extra_refine() -> Array:
-	return [[Vector2(-196.0, -118.0), Vector2(-285.0, -250.0)], [Vector2(-32.0, 106.0), Vector2(-182.0, -92.0)]]
+	# The garden stream, the brook and the pit, and (z from the mill pond up the hill) the creek: a channel two metres
+	# wide on 4m cells showed as patches of water.
+	return [[Vector2(-196.0, -118.0), Vector2(-292.0, -244.0)], [Vector2(-32.0, 106.0), Vector2(-182.0, -92.0), Vector2(-460.0, -182.0)]]
 
 
 ## How far (x, z) is from the park run's line (its corner points; near enough for keeping things off it).

@@ -86,6 +86,16 @@ static func make_material(key: String) -> Material:
 		w.set_shader_parameter("weathering", 0.55 if key == "sugi" else 0.18)
 		return w
 	match key:
+		"log":
+			# Round timber: bark, peeled cedar and cut ends drawn from the log's own coordinates (MiyoshinoRiverKit._log).
+			var lg := ShaderMaterial.new()
+			lg.shader = load("res://log_wood.gdshader")
+			return lg
+		"boulder":
+			# Garden and stream boulders (MiyoshinoPropKit.garden_rock): granite with moss on the tops and the foot.
+			var gs := ShaderMaterial.new()
+			gs.shader = load("res://garden_stone.gdshader")
+			return gs
 		"hiwada":
 			var t := ShaderMaterial.new()
 			t.shader = load("res://hut_thatch.gdshader")

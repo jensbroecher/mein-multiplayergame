@@ -1388,7 +1388,9 @@ in front of the water while driving (Msitu Falls, Bloombay Dunes). `canyon_river
   be regenerated.
   - MultiMesh instances: each mesh's shape is worked out once from its vertices (the median radius of its
     lower band): tall and slender (trees, saguaros, palms, posts) gets a trunk cylinder up to 6m, anything
-    else a box round what's below 2.6m. One StaticBody3D per 64m cell, rock and plant bodies apart (their
+    else a box round what's below 2.6m. Weeping trees (`WEEPING`, by the mesh's file name: MiyoshinoTrees' shidare,
+    WoodlandBuilder's willow; or a MultiMesh's `trunk_radius` meta) are only their trunk, the curtain soft: measured,
+    their curtains hanging to the ground made a drum 6-8m wide nobody could drive in under. One StaticBody3D per 64m cell, rock and plant bodies apart (their
     `surface` meta), shapes added through shape owners, not nodes. Instances drawn twice (near and far
     MultiMeshes) are solid once. Transforms come from `multimesh.buffer`: on the dummy renderer (a headless
     server, whose bots still drive into things) `get_instance_transform()` returns zeros.
@@ -1632,6 +1634,8 @@ pad drops onto the surface under it once the level's collision exists, tilts wit
 nearest lap path (`_lap_tangent`); flat pads at set heights had floated on one side or sunk into slopes.
 `_settle` lies the pad on the plane through its four corners' hits, at the middle's hit; only hits on
 level-ish ground (normal y >= 0.6) within 1.5m of the middle count, and the tilt stops at 40 degrees.
+In a sag (a corner over that plane) it lifts by 0.8 of the rise: on Senbon Sakura Pass's torii path, easing from level
+into a 30% climb, its ends had sunk into the paving (that pad also moved 20m on, past the sag).
 Setting its height from the lowest corner buried pads on slopes (Lakeside's kicker: a metre under the
 deck), and a corner ray clipping a wall or curb tipped some onto their sides.
 `res://scratch/boost_pad_settle_probe.tscn -- <level>` lists each pad's saved and settled place and tilt.
@@ -3997,6 +4001,24 @@ Rebuilt on 2026-11-02 (Gemini's first version had a pit unrelated to its road, t
 - `res://scratch/time_trial_items_check.tscn -- [res://levels/X.tscn] [lap=62]` (headless) runs a real time trial,
   granting the gates with faked lap times: boosts, no boxes or commentator, the HUD's laps, the saved records and the
   end screen's sheet (the player's records files are put back).
+- The ghost (`TimeTrialGhost.gd`, the menu tile's promise): at the green light of a time trial Level adds a
+  "TimeTrialGhost" (`_start_ghost`) that records the human's car (its drawn model's transform and the front wheels' turn,
+  20 times a second) and plays the stage's best run beside it, an orange hologram (`ghost_car.gdshader`: additive, bright
+  at the silhouette, scan lines, faded within 4-11m of the camera so driving through it never fills the view; a BEST
+  time tag over it, in the world), wheels rolling by the distance it covers, fading in at the start and out at the end of
+  its run. Both the recording and the playback run on the race's clock (real time since the green light, as the lap
+  times: the game doesn't pause in a race), so the ghost is where the best run was at the time the HUD shows. At
+  the finish (`_record_run`) it saves the run if it was the stage's new best clean run: `user://ghosts/<stage>.ghost`
+  (store_var: car, paint, laps, total, samples). Not synced (a time trial is single player); a ghost of another number
+  of laps doesn't play. `res://scratch/ghost_test.tscn -- [res://levels/X.tscn] [drive=15] [shots=<dir>]` (headless, not
+  `--fixed-fps`: a fixed step runs physics ahead of the real clock; windowed with `shots=`) records a run and checks the
+  next one plays it back on its path.
+- Tests that change the player's files (records, ghosts, trophies, settings) back them up on disk first
+  (`scratch/user_file_guard.gd`: `protect(tag, paths)` copies them to `user://test_backups/<tag>/`, `restore(tag)` puts
+  them back; a run killed half way leaves its copies for the next run to put back, or
+  `res://scratch/user_file_guard_restore.gd`, `-s`). Their backups had been held in memory, and two ghost test runs
+  killed half way lost the player's time trial records and lap records for good. Never kill such a test; if one is
+  killed, run the restore script.
 
 
 ## Al-Raihana GP (Jebel Sahar and Wadi al-Ghaf)
@@ -4976,12 +4998,23 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   for texts passed to a builder through `_put` (a way-stone stacks its characters) and for the labels a kit emits. A new
   sign text needs an entry there or it stays romaji. `scratch/label_positions.gd` (`-s`, headless, `-- <level>`) lists a
   level's Label3Ds and where they are. The emblem is a drawn five-petal crest.
+- Round timber (`MiyoshinoRiverKit._log`, `_log_pipe`, `_cut`, key "log", `log_wood.gdshader`): cedar bark in fibrous
+  strips and furrows, peeled cedar (draw-knife flats, grain, inner-bark streaks, knots, weathering on the top) and cut ends
+  (growth rings shown only while each spans pixels, sapwood and a red heart round an off-centre pith, saw marks, drying
+  checks from the rim inward, the bark's rim on a barked log); a log's section is a little oval and lumpy (the same outline
+  at both ends) with a slight bow, 10+ sides. Vertex colour carries the part (a), radius (r), seed (g) and shade (b), so
+  give `PropKit.tri_c` (a colour per corner) the data, not a tint. They had been eight-sided tubes in two flat tones.
+- Garden and stream stones (`MiyoshinoPropKit.garden_rock`, key "boulder", `garden_stone.gdshader`): an icosphere pulled
+  into a squat, uneven stone by noise, two or three flat fracture faces, a flattened top and a broad foot, grey granite
+  (granite.gdshaderinc) under moss cushions on the top and a damp mossy foot; occlusion and height over the ground in the
+  vertex colours. They had been seven-sided lathes in flat grey. `scratch/miyoshino_prop_preview.gd ... set=rocks`.
 - Trees: `MiyoshinoTrees.gd` (extends WoodlandBuilder; its own atlas): sakura, yamazakura, shidare, sugi, momiji, take,
   matsu, tsutsuji; `scratch/miyoshino_trees_preview.gd`. The sugi's far stand-in (the user found it a plain cone) is three
   cards crossing on the stem with the crown painted as the near tree grows (`_sugi_far`: ragged tiers, short lowest
   boughs, sky between the tiers), its stem stopping just inside the crown. It added BARKS entries, and uniforms to `acacia_leaves`
   (`backlight_albedo`, `seed_tint_a/b`, `glow`) and `tree_bark` (`node_spacing`, `node_color`) whose defaults leave the
   other stages as they were (`scratch/miyoshino_trees_regress.gd` hashes the old kinds).
+  A weeping cherry's hanging boughs reach down to the ground: DressingColliders makes only its trunk solid (`WEEPING`).
 - Koinobori (the carp streamers of Children's Day): `MiyoshinoPropKit.koinobori_pole` (a pole with a gilt ball and an
   arrow wheel, the five-coloured streamer, the black and red carp and two or three children, halyard and guy ropes) and
   `koinobori_line` (carp on a rope between two masts, as hung across rivers), `koinobori_carp` the open cloth tube.
@@ -5020,18 +5053,58 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   `_depth`), which carve the ground and build the water (RiverWater.gd with one strip, `river_water.gdshader`). The south
   bank's village, the timber bridge, the lumber yard and sawmill (its wheel a Spinner), the forest road, the timber slide
   (planks between log walls) and its kicker, the ford (0.36m deep). The raft train (`RaftCrossing`, RiverRafts.gd: the
-  rafts bob, their deck is still boxes) is 315m against the lap's 533m. Laps about 63s, no respawns (before the forest
+  rafts bob, their deck is still boxes) is 315m against the lap's 533m. Over the water its path lies at the rafts' deck
+  (`_shape_heights`, `RAFT_DECK`) and eases down the banks to it over `RAFT_EASE`; the train fills the span from the
+  path's end to its end (sections stretched a few percent), and no deck fascia is built under a span that carries its own
+  deck (`bridges`' fifth field): smoothed with the banks the path had stood 0.8-1.4m over the rafts, its paving ran a
+  metre over the first raft's logs, and the fascia stood over the bank as a brown wedge. The village's boats ride
+  `BOAT_LIFT` high: their floors lay under the waterline and the river showed in them. Laps about 63s, no respawns (before the forest
   road below was reshaped).
   - The mill race (the user saw the wheel with no water, its flume coming from nowhere and going nowhere, the mill too far
     from the road): `_plan_race()` (from `_init_noise`, before the ground) lays it out and `_race_cut` cuts its channels
     into `_natural` (`_natural_base` is the ground without them). The sawmill stands `MILL_GAP` (4m) off the yard road's
     edge; a creek down the north hill feeds the mill pond (`_pond`, found up the hill where the ground can hold it at the
     flume's height), a sluice, the flume on trestles (`MiyoshinoRiverKit.flume`, `FLUME_*`) into the sawmill's own trough
-    (`sawmill_flume()`; the sawmill is built `with_water` false), the water falling over the wheel (`_build_wheel_fall`,
-    waterfall.gdshader), the pit, a culvert under the road (`culvert_head` at both mouths: the road's grading fills the
+    (`sawmill_flume()`; the sawmill is built `with_water` false), the wheel's water (below), the pit, a culvert under the road (`culvert_head` at both mouths: the road's grading fills the
     channel within about 5m of its flat band), the brook in two small falls into the log pond. The channels' water is
     ribbons on their levels (`_levels`: never rising downstream, never less than `free` under the ground), the river's
-    shader with its own settings. Two water sounds (Gentle_flowing_water.wav) at the wheel and the brook.
+    shader with its own settings. Sounds: the wheel's own loop (`sounds/miyoshino/mill_wheel_loop_b.wav`, tools/elevenlabs
+    `miyo_mill_wheel_b`: buckets filling and spilling, the timber's creak; `MILL_WHEEL_DB`) and Gentle_flowing_water.wav
+    at the pit and the brook.
+  - The creek runs down to the pond as one stream: pools stepping down by cascades (`_densify` every 3m, then
+    `_cascade_levels`: each pool held level until the ground has risen `CREEK_CASCADE` (0.45m) over it, then a short
+    drop), not one sheet sloping with the hill; the turbulence that whitens a drop is `fall` x 2.2, at most 0.5, so its
+    foam is streaks over the water (a level at a fixed distance under a falling bed had come out as a white ribbon with
+    gaps where the ground cut it, and at `fall` x 4 every cascade was still a white sheet).
+    `_build_creek_cascades` lays a sill of `garden_rock`s across each drop and spray over it (GPUParticles, "CreekSpray_n",
+    one process material and quad shared); the ground's grid is halved along the creek (`_extra_refine`).
+  - The wheel (`MiyoshinoRiverKit.water_wheel`, overshot, its top turning toward +z, the way the flume runs): each bucket
+    a start out from the sole and an elbow bent back against the turn (`WHEEL_BUCKETS`, `WHEEL_BUCKET_BACK`), so the
+    loaded side's buckets are cups; they had leaned with the turn and would have spilled as they filled. Its water: the
+    buckets' (`_build_wheel_water`, a quad a bucket under the turning wheel; `mill_bucket_water.gdshader` lays each level
+    in its bucket from MODEL_MATRIX and fills it by where the bucket is: filling under the lip, full down the loaded side,
+    spilling past the axle's height, empty near the bottom, dry on the rising side; its surface is clipped to the bucket's
+    own outline, the two boards with the elbow, the sole and the mouth, a little inside the wood, worked out per vertex:
+    as a straight line across the bucket it showed through the boards), and `_build_wheel_fall`: a thin sheet
+    pouring off the flume's lip into the bucket under it, and particles (`_drops`, `_process_drops`, `water_streak.gdshader`:
+    each drop a streak along its fall, aligned to its velocity and turned to the camera): the pour's drops, the spills from
+    the rim's mouths between 104 and 156 degrees into the pit, the splash where they land and where the pour lands, drips off
+    the rising side, a little mist (`_mist`). Sheets standing under the rim had read as panes of glass, and before that one
+    curtain wrapped round the rim (the user found both weird). The shrouds are sixteen felloe boards a side with joints and
+    iron bolts (`MiyoshinoRiverKit._shroud`, hut_wood's grain), no longer one flat ring. The pit's water is churned (turb
+    0.6), not white.
+  - The carts' water (`_register_race_water`): the mill race's wet channels (the creek, the pit, the brook, the garden
+    stream) are strips of the level's RiverWater at their own levels and the mill pond and the garden's spring pool its
+    pools, so a cart in them splashes, sprays, leaves a wake and is slowed; left out, they had been dry to the carts.
+    `scratch/pond_drop_test.tscn -- res://levels/YoshinoRapidsLevel.tscn x,z ...` says what the water code makes of a spot.
+  - The promenade's lanterns, benches and banners are batched as "promenade" (as "riverside" they held DressingColliders'
+    skip word "river" and had no collider); Yamabushi Trail's trailhead props likewise ("tozanguchi", "carpark_cars": "trail").
+  - The koi (`koi.gdshader`) have small eyes: a gold ring round a black pupil with a glint, either side of the head.
+    They dart away from a cart that comes into the water near them (`KoiFish.gd`, `SCARE_*`: carts in `player_carts`
+    within `SCARE_R` and near the surface): a stream fish shoots along the stream away from it (kept within its banks),
+    a pool fish to the far side of its pool, then eases back to its round; local to each peer.
+    `res://scratch/koi_scare_probe.gd` (`-s`, windowed, `-- [fish=8] [speed=8]`) drives a stand-in cart across one fish's
+    water and prints how far each fish darted (3.2m) and how it settled back.
   - The log pond (`BAY_C`, `BAY_R`): a bay of the north bank in `_natural_base` and `_shore_d`, its water a grid fading
     out over the river's own (COLOR.b) and three RiverWater pools. The rafts that drifted down the river went through the
     timber bridge and the raft train (the user saw them collide): three rafts with loads lie moored in the pond instead
@@ -5050,7 +5123,8 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
     `_race` piece from its spring pool, `GARDEN_POOL`, `GARDEN_STREAM`) under the promenade's drum bridge
     (`arched_bridge`) and a path's smaller one, paths and two plazas (`PARK_PATHS`, `PARK_PLAZAS`), the tea house
     (`chaya`, `TEA_HOUSE`), weeping cherries, maples, pines, azaleas along the paths (MiyoshinoTrees' tsutsuji), purple
-    irises (PondKit.iris with a colour) and `garden_rock`s along the stream; `_tree_pick` plants nothing of its own there
+    irises (PondKit.iris with a colour) and `garden_rock`s along the stream (planned first, `stream_rocks`: the azaleas
+    and irises keep off them, `on_rock`, and off both drum bridges, `on_bridge`; they had grown through them); `_tree_pick` plants nothing of its own there
     (`_in_park`). The ground's grid is halved round the garden stream and the brook (`_extra_refine`): on 4m cells their
     channels showed as patches of water. A three-storey pagoda stands on the hill behind (`_build_hill_pagoda`). The
     props went from about 275k to 515k triangles (the second row of houses most of it): not yet measured on a GPU.

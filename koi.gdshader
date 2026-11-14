@@ -64,8 +64,18 @@ void fragment() {
 	float scale_net = smoothstep(0.38, 0.5, abs(fract(v_obj.z * 22.0 + abs(v_obj.x) * 11.0) - 0.5));
 	col *= 0.9 + 0.1 * scale_net;
 	col = mix(col, mix(col, white, 0.55), v_fin);
+	// Small eyes either side of the head (the mesh's head, nose toward +z, life metres): a pale gold iris round a black
+	// pupil with a glint, as a koi's eye is.
+	vec3 eye_c = vec3(0.066, 0.012, 0.283);
+	float ed = length(vec3(abs(v_obj.x), v_obj.y, v_obj.z) - eye_c);
+	float iris = (1.0 - smoothstep(0.0125, 0.0145, ed)) * (1.0 - v_fin);
+	float pupil = (1.0 - smoothstep(0.0075, 0.0095, ed)) * (1.0 - v_fin);
+	float glint = (1.0 - smoothstep(0.0, 0.0028, length(vec3(abs(v_obj.x), v_obj.y, v_obj.z) - eye_c - vec3(0.002, 0.004, 0.003)))) * (1.0 - v_fin);
+	col = mix(col, vec3(0.78, 0.62, 0.28), iris);
+	col = mix(col, vec3(0.01, 0.01, 0.012), pupil);
+	col = mix(col, vec3(0.95), glint);
 	ALBEDO = col;
-	ROUGHNESS = pat == 1 ? 0.25 : 0.4;
+	ROUGHNESS = mix(pat == 1 ? 0.25 : 0.4, 0.08, pupil);
 	METALLIC = pat == 1 ? 0.45 : 0.0;
 	SPECULAR = 0.6;
 }
