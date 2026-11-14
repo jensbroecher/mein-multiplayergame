@@ -38,15 +38,39 @@ const CLOUD_HIGH := 150.0
 ## mountain below it a gentle dome falling DOME_K a metre to meet the trail where it ends (the cone's top had stood 17m
 ## over the trail's end, which finished in a cutting) and running into the cone further down.
 const PRECINCT_R := 44.0
-const PRECINCT_Y := 252.1
+const PRECINCT_Y := 245.85
 const TERRACE_DROP := 2.6
-const DOME_K := 0.18
+const DOME_K := 0.08
 ## How far inside the wall the terrace starts to fall to the wall's foot (under its coping and the gravel's edge).
 const TERRACE_SLOPE_W := 2.6
+## The finish (the user's: the race ends in front of the temple, driven up the stairs onto the plaza, the people at the
+## sides): the trail leaves its spiral at the corner at TURN_IN_A (degrees), turns TURN_IN_R round toward the summit and
+## runs straight up the great stair onto the terrace and across it to the run-out's end END_Z in front of the main hall
+## (HALL_Z), along the precinct's axis (its frame pf: +z from the summit toward the stair). The stair climbs from
+## STAIR_FOOT_R (from the summit) to the terrace's rim, its treads STAIR_HALF either side of the line between cheek walls
+## CHEEK thick, its grade whatever takes the trail from where it arrives up to PRECINCT_Y (printed: keep it near 16%).
+const TURN_IN_A := 540.0
+const TURN_IN_R := 26.0
+const END_Z := -4.0
+const HALL_Z := -14.0
+const STAIR_FOOT_R := 96.0
+const STAIR_HALF := 7.6
+const CHEEK := 0.9
+## The eases at the stair's foot and head (metres): its grade grows from the trail's and falls to level over them.
+const STAIR_EASE_FOOT := 6.0
+const STAIR_EASE_HEAD := 8.0
+## A tread's depth along the stair (game metres).
+const TREAD := 1.1
 
 var _bridge_s: Array = []
 var _ledge_s: Array = []
 var _raw_route: Route
+## The precinct's axis in plan: from the summit toward the stair (set by _configure from the turn-in corner).
+var _axis := Vector2(-1.0, 0.0)
+## Where the stair's foot and head are along the lap, and the grade it came out at.
+var _s_foot := 0.0
+var _s_head := 0.0
+var _stair_grade := 0.0
 
 
 func _configure() -> void:
@@ -62,16 +86,21 @@ func _configure() -> void:
 	closed = false
 	point_to_point = true
 	start_s = 70.0
-	finish_runout = 46.0
+	finish_runout = 20.0
 	corners = []
 	var a := 0.0
 	var k := 0
-	while a <= TURNS + 0.01:
+	while a <= TURN_IN_A + 0.01:
 		var p: Vector2 = _spiral(a) * (1.0 + (0.03 * sin(float(k) * 2.4) if a > 30.0 and a < TURNS - 40.0 else 0.0))
 		var chord: float = (_spiral(a + STEP) - _spiral(a)).length()
 		corners.append([p, clampf(chord * 0.8, 20.0, 130.0)])
 		a += STEP
 		k += 1
+	# The turn toward the summit, and the run up the stair and across the terrace to the hall.
+	var q: Vector2 = corners[corners.size() - 1][0]
+	corners[corners.size() - 1][1] = TURN_IN_R
+	_axis = q.normalized()
+	corners.append([_axis * END_Z, 0.0])
 	# The run-in: a straight start before the first corner, and the last metres straight onto the summit.
 	var d0: Vector2 = ((corners[1][0] as Vector2) - (corners[0][0] as Vector2)).normalized()
 	corners.push_front([(corners[0][0] as Vector2) - d0 * 150.0, 0.0])
@@ -133,9 +162,51 @@ func _valley_d(q: Vector2) -> float:
 	return best
 
 
-## The summit's grid halved (2.5m), for the terrace's walled edge and the approach.
+## The summit's grid halved (2.5m), for the terrace's walled edge, the stair and its walls.
 func _extra_refine() -> Array:
-	return [[Vector2(-PRECINCT_R - 50.0, PRECINCT_R + 30.0)], [Vector2(-PRECINCT_R - 50.0, PRECINCT_R + 30.0)]]
+	var far: Vector2 = _axis * (STAIR_FOOT_R + 30.0)
+	return [[Vector2(minf(-PRECINCT_R - 50.0, far.x - 20.0), maxf(PRECINCT_R + 30.0, far.x + 20.0))],
+			[Vector2(minf(-PRECINCT_R - 50.0, far.y - 20.0), maxf(PRECINCT_R + 30.0, far.y + 20.0))]]
+
+
+## Where the lap is at a distance `rr` from the summit along the precinct's axis (on the final straight).
+func _s_at_axis(rr: float) -> float:
+	return lap.length - (rr - END_Z)
+
+
+## The stair: from its foot the trail's grade grows over STAIR_EASE_FOOT to the stair's, which holds to STAIR_EASE_HEAD
+## short of the terrace's rim and eases to level there, the terrace's height (PRECINCT_Y, the ground under the paving);
+## level on across the terrace.
+func _shape_heights(r: Route, ys: PackedFloat32Array) -> void:
+	if r != lap:
+		return
+	var n: int = ys.size()
+	var plaza: float = PRECINCT_Y + GROUND_UNDER
+	_s_foot = _s_at_axis(STAIR_FOOT_R)
+	_s_head = _s_at_axis(PRECINCT_R - 0.6)
+	var i_f: int = int(round(_s_foot))
+	var y_f: float = ys[i_f]
+	var g_f: float = ys[i_f] - ys[i_f - 1]
+	var L: float = _s_head - float(i_f)
+	var e1: float = STAIR_EASE_FOOT
+	var e2: float = STAIR_EASE_HEAD
+	var g: float = (plaza - y_f - g_f * e1 * 0.5) / (L - e1 * 0.5 - e2 * 0.5)
+	_stair_grade = g
+	for i in range(i_f, n):
+		var x: float = float(i - i_f)
+		var y: float
+		if x >= L:
+			y = plaza
+		elif x <= e1:
+			y = y_f + g_f * x + (g - g_f) * x * x / (2.0 * e1)
+		elif x >= L - e2:
+			y = plaza - g * (L - x) * (L - x) / (2.0 * e2)
+		else:
+			y = y_f + g_f * e1 + (g - g_f) * e1 * 0.5 + g * (x - e1)
+		ys[i] = y
+	print("  the great stair: %.0fm from %.1f up to %.1f, %.1f%% (the trail arrives at %.1f%%)" % [L, y_f, plaza, g * 100.0, g_f * 100.0])
+	if g < 0.12 or g > 0.2:
+		push_warning("Yamabushi Trail: the great stair's grade is %.1f%%: move PRECINCT_Y to bring it near 16%%" % (g * 100.0))
 
 
 func _spiral(deg: float) -> Vector2:
@@ -247,7 +318,7 @@ func _road_base(_r: Route, s: float, p: Vector2) -> float:
 func _sections(r: Route) -> Array:
 	if r.name == "ValleyRoad":
 		return [[0.0, r.length, K_ASPHALT, r.half]]
-	var cuts: Array = [[0.0, _trail_from(), K_ASPHALT]]
+	var cuts: Array = [[0.0, _trail_from(), K_ASPHALT], [_s_foot, _s_head, K_STEPS]]
 	for b in _bridge_s:
 		cuts.append([float(b[0]), float(b[1]), K_PLANKS])
 	for l in _ledge_s:
@@ -271,6 +342,9 @@ func _grade_params(r: Route, s: float) -> Array:
 		return [r.half + 2.0, r.half + 2.0, cut_slope, fill_slope]
 	if _on_ledge(s):
 		return [0.5, r.half + 2.0, 1.6, 2.6]
+	# The stair stands on a causeway between its cheek walls: the ground drops at the walls' outer faces.
+	if s > _s_foot - 2.0 and s < _s_head + 1.0:
+		return [STAIR_HALF + CHEEK + 0.2, STAIR_HALF + CHEEK + 0.2, cut_slope, 4.0]
 	return [r.half + 2.0, r.half + 2.5, cut_slope, fill_slope]
 
 
@@ -583,7 +657,7 @@ func _build_wayside(root: Node3D, rng: RandomNumberGenerator) -> void:
 	var s: float = 330.0
 	var k := 0
 	var fin: float = lap.length - finish_runout
-	while s < fin - 120.0:
+	while s < minf(fin - 120.0, _s_foot - 70.0):
 		if not _on_bridge(lap, s, -25.0) and not _on_ledge(s):
 			var y: float = lap.y(s)
 			var xf: Transform3D = _beside(lap, s, road_half + 3.4)
@@ -612,162 +686,205 @@ func _build_wayside(root: Node3D, rng: RandomNumberGenerator) -> void:
 
 
 ## The summit (the user's idea, after two pictures: a vermilion hall and a five-storey pagoda on a terrace over the
-## cloud): the run-out ends below a temple's precinct on the summit's walled terrace. From the trail's end a paved
-## approach under a vermilion torii climbs a grand stairway onto the terrace; round its rim a dry-stone wall and a
-## vermilion fence, inside raked gravel and stone paths: the hall at the back facing the stair, the pagoda to its right,
-## the bell tower on the left, the water pavilion by the gate, the old summit shrine (its SANJO post) beside the hall,
-## lanterns, banners, cherries, maples and pines, pilgrims. Its frame `pf`: on the summit, +z toward the trail's end.
+## cloud), where the race ends (the user's: in front of the temple, driven up the stairs onto the plaza, the people at the
+## sides). The trail turns off its spiral toward the summit, passes under a vermilion torii and climbs the great stair
+## (`_build_great_stair`) onto the walled terrace; across it, between the crowd behind barriers either side, to the
+## finish and the run-out's end before the main hall's steps. Round the terrace's rim a dry-stone wall and a vermilion
+## fence, inside raked gravel and stone paths: the hall at the back facing the stair, the pagoda to its right, the bell
+## tower on the left, the water pavilion by the gate, lanterns and banners behind the crowd, cherries, maples and pines,
+## pilgrims; the old summit shrine (its SANJO post) on the dome beside the stair. Its frame `pf`: on the summit, +z toward
+## the stair (the precinct's axis, `_axis`).
 func _build_summit(root: Node3D, rng: RandomNumberGenerator) -> void:
-	var end: Vector3 = lap.pt(lap.length)
-	var fwd: Vector3 = lap.fw(lap.length)
-	# Cars stop short of a wall across the run-out's end.
-	var at: Vector3 = end + fwd * 16.0
-	at.y = _ground_at(at.x, at.z)
-	var stop: StaticBody3D = _body(root, "SummitStopBody")
-	_box_shape(stop, Transform3D(_facing(-fwd, at).basis, at + Vector3(0, 2.0, 0)), Vector3(40.0, 5.0, 2.0))
-	# The old summit shrine on its rock just past the run-out's end, facing the trail, the stone torii over the trail
-	# before the finish, cairns and pilgrims round the shrine (the stage's first summit, which the user liked).
-	var sh: Vector3 = at + fwd * 5.0
-	sh.y = _ground_at(sh.x, sh.z)
-	_put("summit_shrine", prop_kit, _facing(-fwd, sh), "summit_shrine", [LBL, "SANJO"], 1500.0)
-	_note_circle(Vector2(sh.x, sh.z), 8.0)
-	var tx0: Transform3D = _across(lap, lap.length - finish_runout - 40.0)
-	tx0.origin.y -= 0.05
-	_put("summit_shrine", prop_kit, tx0, "torii", [1, 10.4, 7.2], 1500.0)
-	for i in range(10):
-		var a: float = rng.randf() * TAU
-		var p: Vector3 = sh + Vector3(cos(a), 0, sin(a)) * rng.randf_range(7.0, 16.0)
-		if _route_dist(p.x, p.z) < road_half + 3.0 or (p - sh).dot(-fwd) > 2.0:
-			continue
-		p.y = _ground_at(p.x, p.z)
-		_person(p, sh - p, rng.randf_range(0.9, 1.05))
-		_put("summit_shrine", prop_kit, Transform3D(Basis(), p + Vector3(2.0, 0, 1.0)), "cairn", [rng, 0.8], 600.0)
-	# A bamboo fence shows where cars stop (the wall was invisible), stopping short of the approach.
-	var across: Vector3 = Vector3.UP.cross(fwd).normalized()
-	var x0 := -20.0
-	while x0 < 20.0 - 0.1:
-		var x1: float = minf(x0 + 4.0, 20.0)
-		var fa: Vector3 = at + across * x0
-		var fb: Vector3 = at + across * x1
-		fa.y = _ground_at(fa.x, fa.z)
-		fb.y = _ground_at(fb.x, fb.z)
-		_put_world("summit_stopfence", fa, prop_kit, "bamboo_fence", [_life(fa), _life(fb), 1.3], 900.0)
-		x0 = x1
-	var toward: Vector3 = Vector3(end.x, 0.0, end.z).normalized()
+	var toward := Vector3(_axis.x, 0.0, _axis.y)
 	var pf: Transform3D = _facing(toward, Vector3(0.0, PRECINCT_Y, 0.0))
 	var L := func(x: float, z: float) -> Vector3: return pf * Vector3(x, 0.0, z)
 	var face := func(dx: float, dz: float, x: float, z: float) -> Transform3D: return _facing(pf.basis * Vector3(dx, 0.0, dz), pf * Vector3(x, 0.0, z))
-	_build_summit_stair(root, pf, toward)
+	_build_great_stair(root, pf)
 	_build_precinct_ground(root, pf)
 	_build_precinct_rim(pf)
-	# The buildings.
-	_put("summit_hall", town_kit, face.call(0.0, 1.0, 0.0, -10.0), "summit_hall", [LBL], 3000.0)
-	_put("summit_pagoda", town_kit, face.call(-1.0, 0.0, 22.0, 12.0), "pagoda", [5], 3500.0)
-	_put("summit_court", town_kit, face.call(1.0, 0.0, -22.0, 14.0), "bell_tower", [], 1800.0)
-	_put("summit_court", prop_kit, face.call(1.0, 0.0, -12.8, 31.0), "chozuya", [], 1200.0)
-	_put("summit_court", town_kit, face.call(-1.0, 0.0, 28.0, -21.0), "shrine_hall", [LBL], 1500.0)
-	_put("summit_court", prop_kit, face.call(-1.0, 0.0, 10.5, -1.0), "ema_rack", [2.6], 900.0)
+	# The buildings, clear of the run (the road's 7m and the crowd's 9.6-15m either side of the axis).
+	_put("summit_hall", town_kit, face.call(0.0, 1.0, 0.0, HALL_Z), "summit_hall", [LBL], 3000.0)
+	_put("summit_pagoda", town_kit, face.call(-1.0, 0.0, PAGODA.x, PAGODA.y), "pagoda", [5], 3500.0)
+	_put("summit_court", town_kit, face.call(1.0, 0.0, BELL.x, BELL.y), "bell_tower", [], 1800.0)
+	_put("summit_court", prop_kit, face.call(1.0, 0.0, -21.0, 31.0), "chozuya", [], 1200.0)
+	_put("summit_court", town_kit, face.call(-1.0, 0.0, 30.0, -24.0), "shrine_hall", [LBL], 1500.0)
+	_put("summit_court", prop_kit, face.call(-1.0, 0.0, 19.5, HALL_Z + 6.0), "ema_rack", [2.6], 900.0)
 	for side in [-1.0, 1.0]:
-		_put("summit_court", prop_kit, face.call(0.0, 1.0, side * 6.4, -3.0), "komainu", [side < 0.0], 1200.0)
-		_put("summit_court", prop_kit, face.call(0.0, 1.0, side * 6.0, 37.5), "komainu", [side < 0.0], 1200.0)
-		_put("summit_court", prop_kit, face.call(0.0, 1.0, side * 12.0, -7.0), "sake_barrels", [4, 3], 900.0)
-		_put("summit_court", prop_kit, face.call(side * -1.0, 0.0, side * 30.0, -4.0), "hokora", [], 900.0)
-	# Stone lanterns along the path, banners behind them.
-	for z in [33.0, 26.0, 19.0, 6.0, -0.5]:
-		for side in [-1.0, 1.0]:
-			_put("summit_court", prop_kit, face.call(side * -1.0, 0.0, side * 4.7, z), "stone_lantern", [0, 2.3], 1200.0)
+		# Guardian lions at the hall's steps and at the stair's head; sake barrels and small shrines by the hall.
+		_put("summit_court", prop_kit, face.call(0.0, 1.0, side * 9.2, HALL_Z + 5.2), "komainu", [side < 0.0], 1200.0)
+		_put("summit_court", prop_kit, face.call(0.0, 1.0, side * 10.8, PRECINCT_R - 4.0), "komainu", [side < 0.0], 1200.0)
+		_put("summit_court", prop_kit, face.call(0.0, 1.0, side * 14.0, HALL_Z + 1.0), "sake_barrels", [4, 3], 900.0)
+		_put("summit_court", prop_kit, face.call(side * -1.0, 0.0, side * 32.0, -6.0), "hokora", [], 900.0)
+	# Stone lanterns and banners lining the run behind the crowd.
 	var cols: Array = [MK.VERMILION, Color(0.95, 0.94, 0.90), Color(0.16, 0.22, 0.45)]
 	var k := 0
-	for z2 in [29.5, 22.5, 2.5]:
+	for z in [35.0, 26.0, 17.0, 8.0, -1.0]:
 		for side in [-1.0, 1.0]:
-			_put("summit_court", prop_kit, face.call(side * -1.0, 0.0, side * 7.4, z2), "nobori", [cols[k % 3], 4.6], 1200.0)
-			k += 1
+			_put("summit_court", prop_kit, face.call(side * -1.0, 0.0, side * 16.2, z), "stone_lantern", [0, 2.3], 1200.0)
+			if z < 34.0:
+				_put("summit_court", prop_kit, face.call(side * -1.0, 0.0, side * 18.2, z + 4.5), "nobori", [cols[k % 3], 4.6], 1200.0)
+				k += 1
 	# Benches at the rim looking out over the cloud.
 	for ang in [70.0, 112.0, 248.0, 292.0]:
 		var a: float = deg_to_rad(ang)
 		var bp: Vector3 = L.call(sin(a) * (PRECINCT_R - 4.0), cos(a) * (PRECINCT_R - 4.0))
 		_put("summit_court", prop_kit, _facing(Vector3(bp.x, 0.0, bp.z), bp), "red_bench", [false], 900.0)
 	# Trees in the precinct.
-	for t in [["sakura", -34.0, 8.0], ["sakura", 35.0, -4.0], ["sakura", -21.0, 36.0], ["sakura", 21.0, 36.0], ["momiji_red", -32.0, -14.0],
-			["momiji_red", -26.0, -30.0], ["momiji_red", 24.0, -32.0], ["matsu", 0.0, -40.0], ["momiji_red", 36.0, 19.0], ["matsu", -36.0, 22.0]]:
+	for t in [["sakura", -38.0, 2.0], ["sakura", 37.0, -8.0], ["sakura", -24.0, 33.0], ["sakura", 24.0, 33.0], ["momiji_red", -32.0, -14.0],
+			["momiji_red", -26.0, -30.0], ["momiji_red", 22.0, -36.0], ["momiji_red", 37.0, 18.0], ["matsu", -36.0, 20.0]]:
 		var tp: Vector3 = L.call(float(t[1]), float(t[2]))
 		extra_trees.append([t[0], tp.x, tp.z, rng.randf_range(0.85, 1.05), rng.randi_range(0, 1)])
 	_build_summit_slopes(pf, rng)
-	# Pilgrims: on the path, at the hall's steps, round the pagoda, at the rim looking out.
-	for i in range(28):
+	_build_old_shrine(pf, rng)
+	_build_finish_crowd(root, pf, rng)
+	# Pilgrims round the pagoda and at the rim looking out.
+	for i in range(18):
 		var p := Vector3.ZERO
 		var look := Vector3.ZERO
-		var kind: int = i % 4
-		if kind == 0:
-			p = Vector3(rng.randf_range(-2.0, 2.0), 0.0, rng.randf_range(2.0, 34.0))
-			look = Vector3(0, 0, -1.0 if rng.randf() < 0.6 else 1.0)
-		elif kind == 1:
-			p = Vector3(rng.randf_range(-3.5, 3.5), 0.0, rng.randf_range(-2.5, 1.5))
-			look = Vector3(0, 0, -1)
-		elif kind == 2:
+		if i % 2 == 0:
 			var a2: float = rng.randf() * TAU
-			p = Vector3(22.0, 0.0, 12.0) + Vector3(cos(a2), 0.0, sin(a2)) * rng.randf_range(10.5, 13.0)
-			look = Vector3(22.0, 0.0, 12.0) - p
+			p = Vector3(PAGODA.x, 0.0, PAGODA.y) + Vector3(cos(a2), 0.0, sin(a2)) * rng.randf_range(10.5, 12.5)
+			look = Vector3(PAGODA.x, 0.0, PAGODA.y) - p
 		else:
 			var a3: float = deg_to_rad(rng.randf_range(60.0, 130.0) + (170.0 if rng.randf() < 0.5 else 0.0))
 			p = Vector3(sin(a3), 0.0, cos(a3)) * rng.randf_range(39.0, 41.5)
 			look = p
-		if p.length() > PRECINCT_R - 2.0:
+		if p.length() > PRECINCT_R - 2.0 or absf(p.x) < 16.5:
 			continue
-		var wp: Vector3 = pf * p
-		_person(wp, pf.basis * look, rng.randf_range(0.88, 1.05))
+		_person(pf * p, pf.basis * look, rng.randf_range(0.88, 1.05))
 	_note_circle(Vector2(0.0, 0.0), PRECINCT_R + 3.0)
 
+## The pagoda's and the bell tower's places in the precinct's frame.
+const PAGODA := Vector2(28.0, 6.0)
+const BELL := Vector2(-27.0, 8.0)
 
-## The approach: from the trail's end a paved way under a great vermilion torii to the foot of a granite stairway (its
-## treads solid down to their footing) climbing onto the terrace, lanterns either side.
-func _build_summit_stair(root: Node3D, pf: Transform3D, toward: Vector3) -> void:
-	var landing := 1.2
-	var head_r: float = PRECINCT_R - 1.0
-	var n := 20
-	var foot := Vector3.ZERO
-	for it in range(6):
-		var length: float = (0.34 * float(n) + landing) * PROP_SCALE
-		foot = pf * Vector3(0.0, 0.0, head_r + length)
-		foot.y = _ground_at(foot.x, foot.z)
-		var nn: int = maxi(6, int(round((PRECINCT_Y - foot.y) / (0.17 * PROP_SCALE))))
-		if nn == n:
-			break
-		n = nn
-	var rise: float = (PRECINCT_Y - foot.y) / float(n) / PROP_SCALE
-	var sx: Transform3D = _facing(toward, foot)
-	_put("summit_stair", prop_kit, sx, "grand_stairs", [STAIR_W, n, rise, 0.34, landing], 2000.0)
-	print("  summit stair: %d steps of %.0fcm (life) from %.1f to %.1f" % [n, rise * 100.0, foot.y, PRECINCT_Y])
-	# The paved approach from the road's edge to the stair's foot, the great torii over it, lanterns either side.
-	var p0: Vector3 = foot
-	var d := 0.0
-	while d < 40.0:
-		var q: Vector3 = foot + toward * d
-		if _lap_offset(Vector2(q.x, q.z)) < road_half + 0.6:
-			break
-		p0 = q
-		d += 0.25
-	var length2: float = foot.distance_to(Vector3(p0.x, foot.y, p0.z))
-	_approach_paving(root, foot, toward, length2)
-	var tx: Transform3D = _facing(toward, foot + toward * 1.6)
-	tx.origin.y = _ground_at(tx.origin.x, tx.origin.z) - 0.05
-	_put("summit_stair", prop_kit, tx, "torii", [0, 8.6, 6.8], 2000.0)
-	if length2 > 9.0:
-		var tx2: Transform3D = _facing(toward, foot + toward * 7.6)
-		tx2.origin.y = _ground_at(tx2.origin.x, tx2.origin.z) - 0.05
-		_put("summit_stair", prop_kit, tx2, "torii", [0, 7.4, 6.0], 2000.0)
+
+## The great stair: granite treads across the run from its foot to the terrace's rim, each tread's nosing on the
+## lap's line (the road's collision there is that ramp, K_STEPS; the cars ride the nosings), between ashlar cheek walls
+## stepping up with it (solid, stone lanterns on them) that stand down to the ground either side: the stair rises out of
+## a shallow cutting at its foot onto a causeway the terrace's height at its head. A great vermilion torii over its foot,
+## a stone one at its head on the terrace.
+func _build_great_stair(root: Node3D, pf: Transform3D) -> void:
+	var pk: PropKit = MK.new_kit(1.0)
+	var kit := {}
+	var w: float = STAIR_HALF + 0.1
+	var s: float = _s_foot
+	var n := 0
+	while s < _s_head - 0.05:
+		var sb: float = minf(s + TREAD, _s_head)
+		var p: Vector3 = lap.pt(s)
+		var fwd: Vector3 = lap.fw(s)
+		fwd.y = 0.0
+		fwd = fwd.normalized()
+		var right: Vector3 = lap.rt(s)
+		# The tread's top is the road's height at its front edge (the nosing); it reaches back under the next one.
+		var top: float = lap.y(s)
+		var basis := Basis(right, Vector3.UP, -fwd)
+		var c: Vector3 = Vector3(p.x, top - 0.6, p.z) + fwd * (sb - s + 0.3) * 0.5
+		pk.box(kit, "ishi", Transform3D(basis, c), Vector3(w * 2.0, 1.2, sb - s + 0.3), MK.GRANITE.lerp(MK.GRANITE_MOSSY, 0.22 if n % 4 == 0 else 0.07), 1.0)
+		s = sb
+		n += 1
+	# The cheek walls, a level parapet every four treads, down past the ground beside them.
+	var body: StaticBody3D = _body(root, "GreatStairWallsBody")
+	var lanterns := 0
 	for side in [-1.0, 1.0]:
-		if length2 < 5.0:
-			break
-		var lp: Vector3 = foot + toward * (length2 * 0.55) + pf.basis.x * side * (STAIR_W * 0.5 * PROP_SCALE + 1.5)
-		lp.y = _ground_at(lp.x, lp.z)
-		_put("summit_stair", prop_kit, _facing(-pf.basis.x * side, lp), "stone_lantern", [0, 2.4], 1200.0)
+		var k: float = _s_foot - 2.0
+		var seg := 0
+		while k < _s_head + 0.4:
+			var kb: float = minf(k + TREAD * 4.0, _s_head + 0.4)
+			var lat: float = side * (STAIR_HALF + CHEEK * 0.5)
+			var a: Vector3 = lap.pt(k) + lap.rt(k) * lat
+			var b: Vector3 = lap.pt(kb) + lap.rt(kb) * lat
+			var top2: float = maxf(lap.y(k), lap.y(kb)) + 0.75
+			var lo: float = INF
+			for q in [a, b]:
+				for out in [0.0, 2.5]:
+					var g: Vector3 = q + lap.rt(k) * side * out
+					lo = minf(lo, _ground_at(g.x, g.z))
+			var bottom: float = minf(lo, minf(lap.y(k), lap.y(kb))) - 1.2
+			var mid: Vector3 = (a + b) * 0.5
+			var fwd2: Vector3 = Vector3(b.x - a.x, 0.0, b.z - a.z).normalized()
+			var bs := Basis(Vector3.UP.cross(fwd2).normalized(), Vector3.UP, fwd2)
+			var ln: float = Vector2(b.x - a.x, b.z - a.z).length() + 0.04
+			var wall := Transform3D(bs, Vector3(mid.x, (top2 + bottom) * 0.5, mid.z))
+			pk.box(kit, "ishi", wall, Vector3(CHEEK, top2 - bottom, ln), MK.GRANITE.darkened(0.06), 1.0)
+			pk.box(kit, "ishi", Transform3D(bs, Vector3(mid.x, top2 + 0.09, mid.z)), Vector3(CHEEK + 0.16, 0.18, ln + 0.02), MK.GRANITE.lightened(0.04), 1.0)
+			_box_shape(body, wall, Vector3(CHEEK, top2 - bottom, ln))
+			if seg % 2 == 1 and kb < _s_head - 2.0:
+				_put("stair_lanterns", prop_kit, Transform3D(Basis(), Vector3(mid.x, top2 + 0.18, mid.z)), "stone_lantern", [0, 1.7], 1200.0)
+				lanterns += 1
+			k = kb
+			seg += 1
+	var mi := MeshInstance3D.new()
+	mi.name = "GreatStair"
+	mi.mesh = _save_res(MK.commit(pk, kit), "great_stair", stem + "prop_")
+	mi.set_meta(&"skip_dressing_colliders", true)
+	root.add_child(mi)
+	print("  the great stair: %d treads, %d lanterns on its walls" % [n, lanterns])
+	# The torii: vermilion over the foot, stone at the head on the terrace (their pillars clear of the run's 7m).
+	var tx: Transform3D = _across(lap, _s_foot - 3.0)
+	tx.origin.y -= 0.05
+	_put("summit_stair", prop_kit, tx, "torii", [0, 10.6, 9.0], 2500.0)
+	var hx: Transform3D = _facing(-pf.basis.z, pf * Vector3(0.0, 0.0, PRECINCT_R - 2.4))
+	hx.origin.y = PRECINCT_Y - 0.05
+	_put("summit_stair", prop_kit, hx, "torii", [1, 10.6, 8.2], 2500.0)
+	for t in [tx, hx]:
+		for sd in [-1.0, 1.0]:
+			var foot: Vector3 = t.origin + t.basis.x * sd * 5.3 * PROP_SCALE
+			_note_circle(Vector2(foot.x, foot.z), 2.0)
+	# Lanterns either side of the foot, outside the walls.
+	for sd in [-1.0, 1.0]:
+		var lx: Transform3D = _beside(lap, _s_foot - 6.0, sd * (STAIR_HALF + CHEEK + 3.0))
+		_put("summit_stair", prop_kit, _facing(-lap.rt(_s_foot) * sd, lx.origin), "stone_lantern", [0, 2.6], 1200.0)
 	# The stair keeps everything else off it.
-	var mid: Vector3 = foot - toward * (0.34 * float(n) + landing) * PROP_SCALE * 0.5
-	_note_rect(Vector2(mid.x, mid.z), STAIR_W * PROP_SCALE + 6.0, (0.34 * float(n) + landing) * PROP_SCALE + length2 + 6.0, atan2(-pf.basis.x.z, pf.basis.x.x), 1.0)
+	var c2: Vector3 = (lap.pt(_s_foot) + lap.pt(_s_head)) * 0.5
+	_note_rect(Vector2(c2.x, c2.z), (STAIR_HALF + CHEEK) * 2.0 + 4.0, _s_head - _s_foot + 6.0, atan2(_axis.x, _axis.y), 1.0)
 
-## The stairway's width (life size).
-const STAIR_W := 5.0
+
+## The old summit shrine (the stage's first summit, which the user liked) on the dome beside the stair, facing it: its
+## rock, the SANJO post, cairns and pilgrims round it.
+func _build_old_shrine(pf: Transform3D, rng: RandomNumberGenerator) -> void:
+	var sh: Vector3 = pf * Vector3(-30.0, 0.0, 74.0)
+	sh.y = _ground_at(sh.x, sh.z)
+	var to_stair: Vector3 = pf.basis * Vector3(1.0, 0.0, -0.25)
+	_put("summit_shrine", prop_kit, _facing(to_stair, sh), "summit_shrine", [LBL, "SANJO"], 1500.0)
+	_note_circle(Vector2(sh.x, sh.z), 8.0)
+	for i in range(10):
+		var a: float = rng.randf() * TAU
+		var p: Vector3 = sh + Vector3(cos(a), 0, sin(a)) * rng.randf_range(7.0, 15.0)
+		if _route_dist(p.x, p.z) < road_half + 6.0 or (p - sh).dot(to_stair) > 2.0:
+			continue
+		p.y = _ground_at(p.x, p.z)
+		_person(p, sh - p, rng.randf_range(0.9, 1.05))
+		_put("summit_shrine", prop_kit, Transform3D(Basis(), p + Vector3(2.0, 0, 1.0)), "cairn", [rng, 0.8], 600.0)
+
+
+## The crowd: behind barriers either side of the run across the terrace (a gap at the finish gantry's posts), at the
+## approach under the torii, and along the terrace's rim either side of the stair's head looking down it.
+func _build_finish_crowd(root: Node3D, pf: Transform3D, rng: RandomNumberGenerator) -> void:
+	var s_fin: float = lap.length - finish_runout
+	_build_start_crowd(root, _s_head + 5.5, lap.length - 0.5, road_half + 2.6, s_fin - 8.0, s_fin + 8.0, seed_base + 21, [-1.0, 1.0],
+			"Finish", [0.08, 0.2, 0.4], 2)
+	_build_start_crowd(root, _s_foot - 26.0, _s_foot - 6.0, road_half + 2.6, -1.0, -1.0, seed_base + 23, [-1.0, 1.0], "StairFoot")
+	var watch: Vector3 = pf * Vector3(0.0, 0.0, PRECINCT_R + 22.0)
+	var n := 0
+	for side in [-1.0, 1.0]:
+		var a: float = deg_to_rad(17.0)
+		while a < deg_to_rad(44.0):
+			for row in range(2):
+				if rng.randf() < 0.2:
+					continue
+				var rr: float = PRECINCT_R - 1.6 - float(row) * 1.4 - rng.randf_range(0.0, 0.5)
+				var lp := Vector3(side * sin(a) * rr, 0.0, cos(a) * rr)
+				var wp: Vector3 = pf * lp
+				wp.y = PRECINCT_Y
+				var look: Vector3 = (watch - wp)
+				look.y = 0.0
+				_person(wp, look, rng.randf_range(0.9, 1.07), false, -1, rng.randf() < 0.15)
+				n += 1
+			a += deg_to_rad(2.2)
+	print("  %d spectators on the rim over the stair" % n)
+
 
 var _precinct_mat: ShaderMaterial
 
@@ -780,49 +897,9 @@ func _precinct_material() -> ShaderMaterial:
 	return _precinct_mat
 
 
-## The paving of the approach: a ribbon of the road shader's stone flags (kind 1) on the ground from the stair's foot
-## out to the road's edge.
-func _approach_paving(root: Node3D, foot: Vector3, toward: Vector3, length: float) -> void:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var right: Vector3 = Vector3.UP.cross(toward).normalized()
-	var hw: float = STAIR_W * 0.5 * PROP_SCALE - 0.3
-	var rows: int = maxi(2, ceili(length))
-	var lats: Array = [-hw, -hw * 0.5, 0.0, hw * 0.5, hw]
-	var pts := func(i: int, j: int) -> Vector3:
-		var t: float = float(i) / float(rows) * length
-		var q: Vector3 = foot + toward * t + right * float(lats[j])
-		q.y = _ground_at(q.x, q.z) + 0.05
-		return q
-	for i in range(rows):
-		for j in range(lats.size() - 1):
-			var quad: Array = [[i, j], [i, j + 1], [i + 1, j], [i + 1, j + 1]]
-			for tri0 in [[0, 2, 1], [1, 2, 3]]:
-				# Clockwise from above: the face's (c - a) x (b - a) points up.
-				var va: Vector3 = pts.call(quad[tri0[0]][0], quad[tri0[0]][1])
-				var vb: Vector3 = pts.call(quad[tri0[1]][0], quad[tri0[1]][1])
-				var vc: Vector3 = pts.call(quad[tri0[2]][0], quad[tri0[2]][1])
-				var tri: Array = tri0 if (vc - va).cross(vb - va).y > 0.0 else [tri0[0], tri0[2], tri0[1]]
-				for kk in tri:
-					var ii: int = quad[kk][0]
-					var jj: int = quad[kk][1]
-					st.set_normal(Vector3.UP)
-					st.set_color(Color(1.0, 0.25, 0.0, 1.0))
-					st.set_uv(Vector2(float(lats[jj]), float(ii) / float(rows) * length))
-					st.set_uv2(Vector2(1.0, hw))
-					st.add_vertex(pts.call(ii, jj))
-	var mesh: ArrayMesh = st.commit()
-	mesh.surface_set_material(0, _precinct_material())
-	var mi := MeshInstance3D.new()
-	mi.name = "SummitApproachGround"
-	mi.mesh = _save_res(mesh, "approach", stem + "precinct_")
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	root.add_child(mi)
-
-
 ## The terrace's surface: raked gravel (the road shader's kind 5, its rake lines in rings round the summit) out to the
-## wall's coping, and stone paths (kind 1): from the stair's head to the hall's steps, across to the pagoda and the bell
-## tower. Drawn only: the ground under them is the terrace.
+## wall's coping, and stone paths (kind 1) from the run (the lap's own paving, from the stair's head to the hall) across
+## to the pagoda and the bell tower. Drawn only: the ground under them is the terrace.
 func _build_precinct_ground(root: Node3D, pf: Transform3D) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -851,8 +928,8 @@ func _build_precinct_ground(root: Node3D, pf: Transform3D) -> void:
 					st.add_vertex(q[kk][0])
 	# The paths, 3cm over the gravel.
 	var py: float = PRECINCT_Y + 0.06
-	for path in [[Vector2(0.0, PRECINCT_R - 1.5), Vector2(0.0, -10.0 + 2.45 * PROP_SCALE), 2.4], [Vector2(2.4, 12.0), Vector2(22.0 - 7.4, 12.0), 1.6],
-			[Vector2(-2.4, 14.0), Vector2(-22.0 + 4.3, 14.0), 1.6]]:
+	for path in [[Vector2(road_half + 0.4, PAGODA.y), Vector2(PAGODA.x - 9.4, PAGODA.y), 1.6],
+			[Vector2(-road_half - 0.4, BELL.y), Vector2(BELL.x + 4.3, BELL.y), 1.6]]:
 		var p0: Vector3 = pf * Vector3((path[0] as Vector2).x, 0.0, (path[0] as Vector2).y)
 		var p1: Vector3 = pf * Vector3((path[1] as Vector2).x, 0.0, (path[1] as Vector2).y)
 		var dirv: Vector3 = (p1 - p0)
@@ -890,7 +967,7 @@ func _build_precinct_ground(root: Node3D, pf: Transform3D) -> void:
 ## The terrace's rim: a dry-stone wall round it (open where the stair comes up) and a vermilion fence on its coping.
 func _build_precinct_rim(pf: Transform3D) -> void:
 	# The wall and fence end at the stair's cheek walls.
-	var gap_w: float = (STAIR_W * 0.5 + 0.45) * PROP_SCALE + 0.05
+	var gap_w: float = STAIR_HALF + CHEEK + 0.05
 	var drop_life: float = TERRACE_DROP / PROP_SCALE
 	for ring in [[PRECINCT_R, "wall"], [PRECINCT_R - 0.55, "fence"]]:
 		var r: float = ring[0]
@@ -918,8 +995,8 @@ func _build_summit_slopes(pf: Transform3D, rng: RandomNumberGenerator) -> void:
 		var a: float = rng.randf() * TAU
 		var r: float = rng.randf_range(PRECINCT_R + 7.0, 105.0)
 		var lp := Vector3(sin(a) * r, 0.0, cos(a) * r)
-		# Not on the approach.
-		if lp.z > 0.0 and absf(lp.x) < 12.0 and r < 90.0:
+		# Not on the stair, its walls or the approach.
+		if lp.z > 30.0 and absf(lp.x) < 24.0:
 			continue
 		var wp: Vector3 = pf * lp
 		if _route_dist(wp.x, wp.z) < road_half + 9.0 or _occupied(wp.x, wp.z):
@@ -944,7 +1021,7 @@ func _build_edges(root: Node3D) -> void:
 	var s: float = 150.0
 	var run0 := -1.0
 	var n := 0
-	while s < lap.length - finish_runout:
+	while s < _s_foot - 4.0:
 		var bad := false
 		if not _on_bridge(lap, s, -6.0):
 			var p: Vector3 = lap.pt(s) - lap.rt(s) * (road_half + 9.0)

@@ -5154,24 +5154,36 @@ DressingColliders' MESH_SKIP words and nothing on the stage would be solid). Eac
   The first street run must start at s 4, not `closest_s` of a point before s 0 (it returned the lap's end and the shop
   street stood empty). Laps about 50s, no respawns.
 - Yamabushi Trail's summit (the user's idea, from two pictures): the cone's top is a gentle dome (`_summit_h`, `DOME_K`)
-  meeting the trail where it ends (it had finished in a 17m cutting under a bare top), a walled terrace on it
-  (`PRECINCT_R`, `PRECINCT_Y`, the drop inside the wall's line, `TERRACE_SLOPE_W`) with a precinct (`_build_summit`):
+  (it had finished in a 17m cutting under a bare top), a walled terrace on it (`PRECINCT_R`, `PRECINCT_Y`, the drop
+  inside the wall's line, `TERRACE_SLOPE_W`) with a precinct (`_build_summit`), and the race ends there (the user's: in
+  front of the temple, driven up the stairs onto the plaza, the people at the sides). The trail leaves its spiral at the
+  corner at `TURN_IN_A` (540 degrees), turns `TURN_IN_R` toward the summit and runs straight along the precinct's axis
+  (`_axis`, the frame `pf`) under a vermilion torii, up the great stair (`_build_great_stair`: granite treads `TREAD`
+  deep whose nosings lie on the lap's line, the road's collision a ramp there, K_STEPS; ashlar cheek walls stepping up
+  with it, solid, lanterns on them; a stone torii at its head) and across the terrace to the finish, the run-out ending
+  `END_Z` before the main hall (`HALL_Z`). `_shape_heights` lays the stair from the trail's height at `STAIR_FOOT_R` up to
+  the terrace with eases at both ends and prints its grade (15.9%, 52m). Near the top the trail climbs at its 10.5%
+  limit, so the stair's rise is the terrace's height over where the trail arrives: the terrace came down to 245.85 and
+  the dome to 8% (at 18% the trail followed the dome down with the terrace, and the stair stayed at 30%). The crowd
+  (`_build_finish_crowd`): `_build_start_crowd` (its `tag`, `gaps`, `per_row`) behind barriers along the run across the
+  terrace (gapped at the gantry) and at the stair's foot, two rows along the rim either side of the stair's head looking
+  down it; lanterns and banners line the run behind them. The old summit shrine (SANJO) stands on the dome beside the
+  stair (`_build_old_shrine`). AI race (speed=2): all six finish in 104-126s, crossing the line at 35-40 m/s and at rest
+  11-14m on, short of the hall. In the precinct:
   `MiyoshinoTownKit.summit_hall` (vermilion, veranda, karahafu, lanterns), the five-storey pagoda, bell tower, water
   pavilion, a small Shinto hall, lanterns, banners, cherries, red maples (`MiyoshinoTrees` "momiji_red": the maple's
   cards tinted red), raked gravel and paths (the road shader's kinds 5 and 1 on meshes of their own, `precinct_gravel`
-  warmer), `MiyoshinoPropKit.ishigaki` round it and a vermilion fence, `grand_stairs` up from a paved approach under two
-  torii. The old summit shrine stands past the run-out's end behind a bamboo fence (the stop wall), the stone torii over
-  the trail before the finish. The trail is asphalt to the trailhead torii (`_trail_from`), then stone paving (it was
+  warmer), `MiyoshinoPropKit.ishigaki` round it (open for the stair) and a vermilion fence. The trail is asphalt to the trailhead torii (`_trail_from`), then stone paving (it was
   earth); the valley road (`_plan_routes`, a route pinned to the lap only at its start: `_add_route(..., pin_far_end
   false)`) runs 1km on north past the trailhead car park (`_build_trailhead`, `PARK_*`, kei cars and trucks:
   `MiyoshinoPropKit.kei_car`). A stage can halve its ground grid in places (`_extra_refine`; the shortcut-end halving
-  only works since the fix in `_refine_axis`: the other three stages' saved levels predate it). Not raced yet.
-- Yamabushi Trail (4.5km, point to point, dawn): a spiral of corners 1.6 times round a cone (`_spiral`, `_natural`), the
+  only works since the fix in `_refine_axis`: the other three stages' saved levels predate it).
+- Yamabushi Trail (4.5km, point to point, dawn, ending in the summit's precinct): a spiral of corners 1.6 times round a cone (`_spiral`, `_natural`), the
   mountain always on the right; a suspension bridge over the gorge (in the cloud: laid along the chord between its
   ends, shifted and widened to hold the curving trail, its side colliders along its netting; along the trail's heading
   at its start the trail's planks ran out past the netting toward the far end), plank walks (LEDGES) with chains,
-  chain fences on the drops, the summit shrine. `CloudLayer.gd` sets every viewer's fog and sun by their camera's height
-  (the band 96-150m: fog to 85m inside it), `cloud_sea.gdshader` the sheet seen from above. Bots take 114-130s.
+  chain fences on the drops. `CloudLayer.gd` sets every viewer's fog and sun by their camera's height
+  (the band 96-150m: fog to 85m inside it), `cloud_sea.gdshader` the sheet seen from above. Bots take 104-126s.
 - Music `MusicManager.STAGE_TRACKS` "senbon", "yoshino", "monzen", "yamabushi" (`music/miyoshino/`, instrumental,
   tools/elevenlabs). Their ambience is their own (`sounds/miyoshino/<bed>/`, tools/elevenlabs `miyo_*` jobs, three
   takes a bed, prompted without insects or near birds): the user found Lakeside's insects-and-birds bed, which they had

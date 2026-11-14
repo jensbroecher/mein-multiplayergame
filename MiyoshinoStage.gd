@@ -2501,18 +2501,19 @@ func _person(pos: Vector3, face: Vector3, size := 1.0, seated := false, pose := 
 	_people.append([pos, face.normalized(), seated, false, pose, size, yukata])
 
 
-## Crowd barriers with people behind them along both sides of the lap from s0 to s1 (the start).
+## Crowd barriers with people behind them along both sides of the lap from s0 to s1 (the start; `tag` names another
+## place's, the finish's), each row of people behind them missing `gaps` of the time, `per_row` people a row a barrier.
 func _build_start_crowd(root: Node3D, s0: float, s1: float, lat: float, skip_from: float, skip_to: float, seed_v: int,
-		sides: Array = [-1.0, 1.0]) -> void:
+		sides: Array = [-1.0, 1.0], tag := "Start", gaps: Array = [0.25, 0.6], per_row := 1) -> void:
 	var node := Node3D.new()
-	node.name = "StartVenue" if sides.size() == 2 else ("StartVenueLeft" if float(sides[0]) < 0.0 else "StartVenueRight")
+	node.name = tag + "Venue" if sides.size() == 2 else (tag + "VenueLeft" if float(sides[0]) < 0.0 else tag + "VenueRight")
 	root.add_child(node)
 	var pk := PropKit.new()
 	pk.material_for = func(key: String) -> Material: return _camp_material(key)
 	var camp := CampKit.new(pk)
 	var bkit := {}
 	var body := StaticBody3D.new()
-	body.name = "StartBarriersBody"
+	body.name = tag + "BarriersBody"
 	node.add_child(body)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_v
@@ -2538,11 +2539,13 @@ func _build_start_crowd(root: Node3D, s0: float, s1: float, lat: float, skip_fro
 			body.add_child(bs)
 			_note_rect(Vector2(pos.x, pos.z), step, 1.0, atan2(fwd.x, fwd.z))
 			count += 1
-			for row in range(2):
-				if rng.randf() < (0.25 if row == 0 else 0.6):
+			for slot in range(gaps.size() * per_row):
+				var row: int = slot / per_row
+				if rng.randf() < float(gaps[row]):
 					continue
 				var plat: float = side * (lat + 1.6 + float(row) * 1.5 + rng.randf_range(0.0, 0.7))
-				var ps: Dictionary = lap.spot(s + rng.randf_range(-1.2, 1.2), plat, 0.0)
+				var along: float = (float(slot % per_row) + 0.5) / float(per_row) - 0.5
+				var ps: Dictionary = lap.spot(s + along * step + rng.randf_range(-1.2, 1.2) / float(per_row), plat, 0.0)
 				var pp: Vector3 = ps["pos"]
 				pp.y = _stand_y(pp.x, pp.z)
 				var face: Vector3 = -(ps["right"] as Vector3) * side
@@ -2552,10 +2555,10 @@ func _build_start_crowd(root: Node3D, s0: float, s1: float, lat: float, skip_fro
 	pk.reset_frame()
 	var bmi := MeshInstance3D.new()
 	bmi.name = "Barriers"
-	bmi.mesh = _save_res(pk.commit(bkit), "start_barriers" + ("" if sides.size() == 2 else ("_l" if float(sides[0]) < 0.0 else "_r")), stem + "prop_")
+	bmi.mesh = _save_res(pk.commit(bkit), tag.to_lower() + "_barriers" + ("" if sides.size() == 2 else ("_l" if float(sides[0]) < 0.0 else "_r")), stem + "prop_")
 	bmi.visibility_range_end = 700.0
 	node.add_child(bmi)
-	print("  start: %d barriers, %d spectators so far" % [count, _people.size()])
+	print("  %s: %d barriers, %d spectators so far" % [tag.to_lower(), count, _people.size()])
 
 
 ## Box colliders along a route from s0 to s1 at `lat` (right of the line), `h` high over the road.
